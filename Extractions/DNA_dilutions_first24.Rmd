@@ -82,7 +82,7 @@ head(concs)
 
 
 ```{r}
-concs = mutate(in_range_qs, remaining_original_ul = 65 - ul_original_consumed) # make new column with remaining ul of original extract. all extracts from this extraction day eluted in 75ul of elution buffer, -10ul for safety/EB that never made it out of the spin column
+concs = mutate(concs, remaining_original_ul = 65 - ul_original_consumed) # make new column with remaining ul of original extract. all extracts from this extraction day eluted in 75ul of elution buffer, -10ul for safety/EB that never made it out of the spin column
 
 concs$remaining_original_ul # looks like that worked
 ```
@@ -145,7 +145,7 @@ concs[index, "ul_original_into_final"] = v1(2,
 
 concs = mutate(concs, # re-write h2o 
                H2O_ul = final_vol_ul - ul_original_into_final)
-View(concs)
+head(concs)
 ```
 
 
@@ -181,6 +181,40 @@ DNA_dilutions_first24 = rename(DNA_dilutions_first24, ng_per_ul_original = extra
 write.csv(DNA_dilutions_first24, "Results/DNA_dilutions_first24.csv")
 ```
 
+# OR what if we did smaller volume dilutions, like into an 8-strip (200ul capacity? let's go for 180ul)
+```{r}
+# v2 = 180ul
+# c2 = 2 ng/ul
+# c1 is measured concentration
+
+# find v1
+
+smallTubes = select(DNA_dilutions_first24, !c())
+
+```
 
 
+
+
+```{r}
+already_good = filter(concs, concs$final_vol_ul <= 180)
+
+
+# constrain v2 and find v1; (c2v2)/c1 = v2
+v1 = function(c2, v2, c1) {
+  v1 = (c2*v2)/c1
+  return(v1)
+}
+
+index = which(concs$extraction_id !in already_good$extraction_id) # indicies or 
+concs[index, "final_vol_ul"] = 1450 # set final vol of dilution
+
+concs[index, "ul_original_into_final"] = v1(2, 
+                                                         concs$final_vol_ul[index], # final vol set above
+                                                         concs$extrapolated_original_ng_per_ul[index]) # replace the v1 value in concs for #3
+
+concs = mutate(concs, # re-write h2o 
+               H2O_ul = final_vol_ul - ul_original_into_final)
+head(concs)
+```
 
