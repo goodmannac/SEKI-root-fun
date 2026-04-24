@@ -1,0 +1,226 @@
+---
+title: "DNA_dilutions_first24"
+author: "Anna Goodman"
+date: "2026-02-15"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+```
+
+```{r}
+q_data = read_csv("Qubit Results - raw_sample_results.csv") # read in qubit data
+# 1 row = 1 measurement. Some extractions measured multiple times, where first measurement read out of range (OOR)
+
+head(q_data)
+```
+
+```{r}
+q_data = q_data %>% mutate(ng_per_ul = as.numeric(ng_per_ul)) # coerce the ng_per_ul column of this dataframe to be numeric; this will make the numbers class numeric and the "HIGH" or "LOW" entries (for OORs) NAs
+
+is.numeric(q_data$ng_per_ul) #it worked
+q_data$ng_per_ul # confirmed HIGH and LOW are now NA
+```
+
+```{r}
+# make a dataframe without OOR measurements
+in_range_qs = filter(q_data, !is.na(q_data$ng_per_ul)) # should remove non-numeric concentration results
+
+head(in_range_qs) # not empty
+nrow(in_range_qs) # 24 rows: good, one for each extraction
+```
+```{r}
+# ok so now we need to count up all the ul consumed from each original extract
+  ## from q_data
+# and calculate how much is left of each extract 
+  ## in in_range_qs
+
+for (i in 1:length(in_range_qs$extraction_id)) { # for each original extraction,
+  total_ul_consumed = 0 # initialize var to store total ul used for qubitting
+  for (j in 1:length(q_data$extraction_id)) { # then look through each qubit measuremnt
+    
+    if (q_data$extraction_id[j] == in_range_qs$extraction_id[i]) { # if that qubit measurement was of this original extraction,
+      total_ul_consumed = total_ul_consumed + q_data$ul_original_consumed[j] # add the # of ul consumed to make that quibit measurement to the total consumed from this original extraction
+    } else {}
+  }
+  in_range_qs$ul_original_consumed[i] = total_ul_consumed # now store the total ul consumed for all measurements of this original extraction in in_range_qs
+}
+
+head(in_range_qs)
+```
+
+```{r}
+# extrapolate original extraction's concentration for cases where we had to measure a dilution on the qubit
+
+# convert the "dilution factor" into a proportion (original extract volume)/(H2O volume)
+proportion = c() # put proportion values in a vector, in matching order with the data frame
+for (i in 1:length(in_range_qs$extraction_id)) {
+  dilfac = in_range_qs$dilution_factor[i]
+  if (dilfac == "original_extract") {
+    proportion[i] = 1
+  } else if (dilfac == "1:1") {
+    proportion[i] = 0.5
+  } else if (dilfac == "1:3") {
+    proportion[i] = 0.25
+  }
+}
+
+in_range_qs = mutate (in_range_qs, proportion_original = proportion) # make that vector a column in in_range_qs
+
+
+concs = mutate (in_range_qs, extrapolated_original_ng_per_ul = (1/proportion_original)*ng_per_ul) # calculate original concentration from measured concentration of dilution
+
+head(concs)
+```
+
+
+
+
+```{r}
+concs = mutate(concs, remaining_original_ul = 65 - ul_original_consumed) # make new column with remaining ul of original extract. all extracts from this extraction day eluted in 75ul of elution buffer, -10ul for safety/EB that never made it out of the spin column
+
+concs$remaining_original_ul # looks like that worked
+```
+
+# Now, we see what we need to do to dilute each extract to 2ng/ul 
+
+c (concentration) = m (mass) / v (volume)
+
+current state (1): we have a finite mass of DNA, in elution buffer, at a measured concentration (ng/uL)
+    # c1 = qubit-measured concentration in ng/ul ("extrapolated_original_ng_per_ul")
+    # m1 = total mass of DNA in usable volume of original extract
+    # v1 = usable volume of original extract ("remaining_original_ul")
+state 2: we want to use all the DNA in that usable volume of extract to make a 2ng/ul solution of unknown volume
+    # c2 = 2ng/ul
+    # m2 = m1; total mass of DNA in diluted extract (we're using all of the usable original)
+    # v2 = total volume of diluted extract
+* we need to find v2! and v2 will be made of v1+H2O, so volume of H2O needed will be v2-v1
+
+
+c = m/v, so cv = m
+m2 = m2, so c1v1 = c2v2, so (c1v1)/c2 = v2
+and H2O needed = v2-v1
+
+```{r}
+# calculate total volume of diluted extract
+v2 = function(c1, v1, c2) {
+  v2 = (c1*v1)/c2
+  return(v2)
+}
+
+concs = mutate(concs, # add 2 columns: final volume of diluted extract, volume of H2O to add
+               final_vol_ul = v2(extrapolated_original_ng_per_ul, remaining_original_ul, 2),
+               H2O_ul = final_vol_ul - remaining_original_ul)
+head(concs)
+
+
+```
+
+```{r}
+# some big numbers in there. want to use all 1.5 mL tubes for these dilutions
+tube_fit_problem = filter(concs, concs$final_vol_ul >= 1450)
+tube_fit_problem #51 is pushing it but will probably fit. #3 will not
+
+concs = mutate(concs, ul_original_into_final = remaining_original_ul) # make a separate column for v1, showing what volume of original extract should go into the final dilution. set default as all remaining_original_ul
+
+# chance the ul_original_into_final volume, just for #3.
+
+# constrain v2 and find v1; (c2v2)/c1 = v2
+v1 = function(c2, v2, c1) {
+  v1 = (c2*v2)/c1
+  return(v1)
+}
+
+index = which(concs$extraction_id == 3) # store the index of extraction ID 3
+concs[index, "final_vol_ul"] = 1450 # set final vol of dilution
+
+concs[index, "ul_original_into_final"] = v1(2, 
+                                                         concs$final_vol_ul[index], # final vol set above
+                                                         concs$extrapolated_original_ng_per_ul[index]) # replace the v1 value in concs for #3
+
+concs = mutate(concs, # re-write h2o 
+               H2O_ul = final_vol_ul - ul_original_into_final)
+head(concs)
+```
+
+```{r}
+# calculate final concentration to double-check
+
+c2 = function(c1, v1, v2) {
+  c2 = (c1*v1)/v2
+  return(c2)
+}
+
+concs = mutate(concs, 
+               final_ng_per_ul = c2(extrapolated_original_ng_per_ul, ul_original_into_final, final_vol_ul))
+
+concs$final_ng_per_ul # all 2s!
+```
+```{r}
+# tidy unnecessary columns, rename for clarity
+DNA_dilutions_first24 = select(concs, !c(qubit_run_id, dilution_factor, ul_original_consumed, proportion_original, ng_per_ul))  # remove columns which were only relevant as metadata for qubit measurements
+
+DNA_dilutions_first24 = rename(DNA_dilutions_first24, original_ng_per_ul = extrapolated_original_ng_per_ul) # rename concentration of original extract for clarity
+
+DNA_dilutions_first24 = DNA_dilutions_first24[order(DNA_dilutions_first24$extraction_id),] # reorder dataframe by extraction id
+                               
+```
+
+
+```{r}
+write.csv(DNA_dilutions_first24, "Results/DNA_dilutions_first24.csv")
+```
+
+# OR what if we did smaller volume dilutions, like into an 8-strip (200ul capacity? let's go for 180ul)
+```{r}
+already_good = filter(concs, concs$final_vol_ul <= 190) # set aside cases where our current dilution plan would fit in a 200ul strip tube 
+head(already_good)
+
+concs200 = concs # make a copy of our data table to work in
+
+index = which(!(concs$extraction_id %in% (already_good$extraction_id))) # find indicies of extractions where we'd need a new dilution plan to fit into 200ul strip tubes
+concs200[index, "final_vol_ul"] = 190 # set final vol of dilution, 200ul - 10ul for headspace
+
+# for extractions with these indices, find volume of original extraction we need to make a 2ng/ul dilution with a final vol of 190ul
+concs200[index, "ul_original_into_final"] = v1(2.01, # a little more than 2, so rounding errors don't push the final concentrations below 2
+                                              concs200$final_vol_ul[index], # final vol set above
+                                              concs200$extrapolated_original_ng_per_ul[index]) # original extract concentrations
+
+concs200 = mutate(concs200, # re-write h2o vol
+               H2O_ul = final_vol_ul - ul_original_into_final)
+head(concs200)
+```
+```{r}
+# round volumes I'll be pipetting to the tenth place so I can do it with a p200
+
+concs200 = mutate(concs200, 
+               round_original = round(ul_original_into_final, digits = 1),
+               round_H2O = round(H2O_ul, digits = 1),
+               final_vol_ul = round_H2O + round_original
+)
+                                      
+
+# calculate actual final concentration 
+concs200 = mutate(concs200, 
+               final_ng_per_ul = c2(extrapolated_original_ng_per_ul, round_original, final_vol_ul))
+
+concs200$final_ng_per_ul # good, once I re-set the final concentration in the code chunk above to 2.01
+```
+```{r}
+# tidy 
+DNA_dilutions_first24_200 = select(concs200, !c(qubit_run_id, dilution_factor, ul_original_consumed, proportion_original, ng_per_ul)) # remove columns which were only relevant as metadata for qubit measurements
+
+DNA_dilutions_first24_200 = rename(DNA_dilutions_first24_200, original_ng_per_ul = extrapolated_original_ng_per_ul) # rename concentration of original extract for clarity
+
+DNA_dilutions_first24_200 = DNA_dilutions_first24_200[order(DNA_dilutions_first24_200$extraction_id),] # reorder dataframe by extraction id
+
+```
+
+```{r}
+write.csv(DNA_dilutions_first24_200, "Results/DNA_dilutions_first24_striptubes.csv")
+```

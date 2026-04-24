@@ -1,0 +1,146 @@
+---
+title: "Extra grounds inventory and extraction metadata"
+author: "Anna Goodman"
+date: "2026-02-16"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+```
+
+# read main tab from EM Metadata entry spreadsheet
+```{r}
+metaMain = read_csv("EM Metadata entry, SEKI 2024 - PILA.csv") %>% # load in volumes of extra roots
+  mutate(Extraction_ID = as.numeric(Extraction_ID)) %>%
+  filter(!is.na(Extraction_ID))
+
+head(metaMain) # look at it
+
+```
+
+# read in tab from EM Metadata entry spreadsheet with info on how much extra ground roots we have for each sample
+```{r}
+xtra_grid = read_csv("../root_grounds_inventory/EM Metadata entry, SEKI 2024 - Xtra grounds volume.csv") # load in volumes of extra roots
+
+head(xtra_grid) # look at it
+
+xtra_grid = xtra_grid[, 1:7] %>% # trim to exclude notes columns
+  filter(`Box dated` != "totals:" & `Box dated` != "percents:")
+
+head(xtra_grid) # look at it again
+max(xtra_grid$Extraction_ID) # look at it again
+
+```
+
+# make a single column in xtra_grid that says how much extra root grounds are left. A is least, E is most
+```{r}
+xtra_grid = mutate(xtra_grid, volXtra = "placeholder")
+for (i in 1:length(xtra_grid$Extraction_ID)) {
+  if (is.na(xtra_grid$A[i]) == FALSE) {
+    xtra_grid$volXtra[i] = "A"
+  } else if (is.na(xtra_grid$B[i]) == FALSE) {
+    xtra_grid$volXtra[i] = "B"
+  } else if (is.na(xtra_grid$C[i]) == FALSE) {
+    xtra_grid$volXtra[i] = "C"
+  } else if (is.na(xtra_grid$D[i]) == FALSE) {
+    xtra_grid$volXtra[i] = "D"
+  } else if (is.na(xtra_grid$E[i]) == FALSE) {
+    xtra_grid$volXtra[i] = "E"
+  }
+}
+head(xtra_grid)
+```
+
+# view which samples have most extra root grounds 
+```{r}
+xtra_grid = xtra_grid[rev(order(xtra_grid$Extraction_ID)),] # reorder dataframe by extraction id, low to high
+xtra_grid = xtra_grid[rev(order(xtra_grid$volXtra)),] # reorder dataframe by volXtra, with most volume first
+head(xtra_grid)
+
+xtra_table = xtra_grid %>%
+  select(`Box dated`, Extraction_ID, volXtra) %>% # move useful columns to a simpler dataframe
+  rename(xtra_box_label = `Box dated`)
+head(xtra_table)
+```
+
+# add info: extraction date, qubit results, dilutions where availible
+
+## option: from qubit metadata
+```{r}
+qubit_results = read_csv("../Qubit Results - raw_sample_results.csv") 
+
+done_extractions = qubit_results %>% filter(dilution_factor == "original_extract")
+
+extraction_metadata = metaMain %>%
+  left_join(xtra_table, join_by("Extraction_ID")) %>%
+  left_join(done_extractions, join_by("Extraction_ID" == "extraction_id")) 
+head(extraction_metadata)
+nrow(extraction_metadata) # too many rows. Checked it out, it's because xtra_table has a few duplicate rows; 
+
+extraction_metadata = extraction_metadata %>%
+  filter(!(Extraction_ID == 39 & volXtra == "A")) %>% # 39 reported as having A extra and D extra, in an august and december box. Removing december box with A extra, because the grinding happened in august 2025.
+  filter(!(Extraction_ID == 47 & volXtra == "B")) %>% #47 appears twice in xtra_table, once with box dated nov 2026. It was extracted in 2026, so I'm keeping the other one
+    filter(!(Extraction_ID == 63 & volXtra == "E")) # 63 appears twice in xtra_table, box dates equivalent. Taking out entry with more volume to be conservative
+
+nrow(extraction_metadata)
+```
+```{r}
+done_extractions = extraction_metadata %>%
+  filter(!is.na(date_extracted))
+
+to_extract = extraction_metadata %>%
+  filter(is.na(date_extracted))
+```
+
+
+# note and define special cases
+```{r}
+done = c(36, 39) # #39 and #36 were extracted in AG trial in oct 2025. Need to check on stored DNA, put xtra roots into TD tubes if not good
+failedExtractions = c(46, 70) # these extractions failed, done as trial by TB and JC in summer/fall 2025
+failedLP = c() # one tree (71?) yielded verrry faint bands in LPA despite reasonable template concentration. Holding re-dos from this category until all first-attempt LP is at S2 PCR
+AttendToGrounds = c(failedExtractions, 96, 37, 85, 56)
+        # 96's root grounds were supposed to get mixed with 85 pre-extraction, but evan and I extracted 85 today (april 14th. ughhh)
+                 # could weigh extra roots, determine % removed for first extraction, remove same % of mass from 96, and mix?
+        # 37's roots need to be mixed with 56! See 47, 56 Extrtaction ID mix-up in my OneNote
+pendingConf  = c(18, 81) # ambiguous labels pending confirmation
+```
+
+# tidy to_extract and save
+```{r}
+to_extract <- to_extract %>%
+  select(c(Extraction_ID, date_extracted, volXtra, xtra_box_label, date_ground_code, Tree_Name)) %>%
+  arrange(Extraction_ID) %>% # sort by how much extra root we have
+  mutate(specialCases = case_when(Extraction_ID %in% AttendToGrounds ~ "attend_to_grounds", Extraction_ID %in% pendingConf ~ "confirm_label"))
+
+
+
+#write.csv(to_extract, "Results/extractions_left_after_16April2026_bigMetadata.csv")
+```
+
+# tidy to_extract and save
+```{r}
+to_attend <- extraction_metadata %>%
+  select(c(Extraction_ID, date_extracted, volXtra, xtra_box_label, date_ground_code, mg_tube_empty, mg_tube_full, mg_roots_in_TD_tube, Tree_Name)) %>%
+  arrange(Extraction_ID) %>% # sort by how much extra root we have
+  mutate(specialCases = case_when(Extraction_ID %in% AttendToGrounds ~ "attend_to_grounds", Extraction_ID %in% pendingConf ~ "confirm_label")) %>%
+  filter(!is.na(specialCases))
+
+
+
+write.csv(to_attend, "Results/to_attend_21April2026.csv")
+```
+
+
+
+
+
+
+
+
+
+

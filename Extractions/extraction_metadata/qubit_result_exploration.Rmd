@@ -1,0 +1,151 @@
+---
+title: "DNA_dilutions_first24"
+author: "Anna Goodman"
+date: "2026-02-15"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+```
+
+```{r}
+q_data = read_csv("../Qubit Results - raw_sample_results.csv") # read in qubit data
+# 1 row = 1 measurement. Some extractions measured multiple times, where first measurement read out of range (OOR)
+
+head(q_data)
+```
+```{r}
+# make a dataframe with only OOR measurements
+oor_strings = c("High", "Low")
+oor_qs = q_data %>%
+  filter((ng_per_ul %in% oor_strings | ng_per_ml %in% oor_strings)) %>%
+  mutate(
+    ng_per_ul = case_when(
+      is.na(ng_per_ul) ~ ng_per_ml,
+      !is.na(ng_per_ul) ~ ng_per_ul
+                               ) # put all in ng_per_ul column
+         ) 
+
+head(oor_qs)
+# ok looking at this, the only oor-low from extraction batch 1 (12 feb 2026) was a 1:1 dilution of #14; looks like this qubit was messed up, and when it was re-done, the 1:1 dilution of #14 was readable.
+
+failed_extractions = oor_qs %>%
+  filter(date_extracted > 20260212) %>% #ignore results from first extraction; see note above
+  filter(ng_per_ul == "Low") %>%
+  group_by(date_extracted) # sort by batch so I can go find notes on them 
+
+View(failed_extractions) # these are only the ones that I re-did from evan's qubit and then they were oor high
+
+# oor highs have largely been diluted and had their concentration back extrapolated. a few haven't yet as of 22 april 2026; need the rest of the dilution calcs to figure out. those pasted below, this cont. below that. 
+```
+```{r}
+qs_w_calcs = read_csv("../dilutions/Results/DNA_dilutions_all_striptubes.csv")
+```
+
+```{r}
+library(ggplot2)
+
+concs4graph = qs_w_calcs %>% mutate(date_extracted = as.character(date_extracted))
+ggplot(concs4graph, aes(x = date_extracted, y = original_ng_per_ul)) +
+  geom_boxplot() + geom_jitter()
+```
+```{r}
+to_dilute = oor_qs %>%
+  filter(ng_per_ul == "High") %>%
+  filter(!extraction_id %in% qs_w_calcs$extraction_id)
+head(to_dilute) # just 8, 9, 16 also need to get re-done. these are all from 14 april 2026 (extraction run 2) so will add 3 reasonably high points to the graph above
+
+# so as far as we know, 0 extractions have actually failed
+```
+```{r}
+# let's check on low values and see if these have any commonalities in the notes?
+lowConcs = qs_w_calcs %>%
+  filter(original_ng_per_ul < 2)
+
+head(select(lowConcs, c(extraction_id, date_extracted, original_ng_per_ul)))
+# no handwritten notes about the extraction of #34. #56 had notably little input tissue and was clearer/less dirty looking than others throughout extraction
+
+# no handwritten notes about extraction of #79
+
+# More supernatant pulled off of 39 between CD1 and CD2 than 36, which was extracted similtaneously. ~300ul pulled off of 39 vs ~250 off of 36. 36 evidently was a more sucessful extraction
+```
+# see if input mass effected dna yield
+```{r}
+e_md = read.csv("../extraction_metadata/Results/extraction_metadata_w_dilutions.csv")
+```
+
+```{r}
+# compare root mass input to extraction with yield
+concs4graph = e_md %>% mutate(date_extracted = as.character(date_extracted)) %>%
+  mutate(mg_roots_in_TD_tube = as.numeric(mg_roots_in_TD_tube))
+
+ggplot(concs4graph, aes(x = mg_roots_in_TD_tube, y = original_ng_per_ul, color = date_extracted)) +
+  geom_smooth(method = "lm") +
+  geom_point()
+
+ggplot(concs4graph, aes(x = mg_roots_in_TD_tube, y = original_ng_per_ul)) +
+  geom_smooth(method = "lm") +
+  geom_point()
+
+ggplot(concs4graph, aes(x = mg_roots_in_TD_tube, y = original_ng_per_ul)) +
+  geom_smooth(method = "lm", formula = 'y ~ x + I(x^2)') +
+  geom_point()
+```
+
+# not super informative
+# #24 was messy from the notes, but yield is 8.something; normal
+
+```{r}
+# compare root mass input to extraction with yield, by plot
+concs4graph = e_md %>% mutate(date_extracted = as.character(date_extracted)) %>%
+  mutate(mg_roots_in_TD_tube = as.numeric(mg_roots_in_TD_tube))
+
+ggplot(concs4graph, aes(x = mg_roots_in_TD_tube, y = original_ng_per_ul, color = Plot_Name)) +
+  geom_smooth(method = "lm") +
+  geom_point()
+
+ggplot(concs4graph, aes(x = Plot_Name, y = original_ng_per_ul, color = mg_roots_in_TD_tube)) +
+  geom_boxplot() +
+  geom_point() + 
+  theme(
+    axis.text.x = element_text(angle = 90)
+  )
+```
+
+```{r}
+wetcores = e_md %>%
+  filter(storage_type == "wet")
+
+paired_storage = e_md %>%
+  filter(Tree_Name %in% wetcores$Tree_Name) %>%
+  select(c(Tree_Name, storage_type, original_ng_per_ul))
+
+head(paired_storage)
+
+paired_storage_wide = paired_storage %>%
+  reshape(direction = "wide",
+          idvar = "Tree_Name", timevar = "storage_type")
+
+head(paired_storage_wide) 
+
+# PILA6a_7 was extracted today, 23 April, and had OOR high on first qubit run. removing it for now
+
+ttest_df = paired_storage_wide %>%
+  filter(Tree_Name != "PILA6a_7")
+
+t.test(ttest_df$original_ng_per_ul.dry, ttest_df$original_ng_per_ul.wet, paired = TRUE)
+# significantly less DNA yield from wet-stored cores than dry. huh. 
+```
+
+```{r}
+ggplot(paired_storage, aes(x = storage_type, y = original_ng_per_ul, color = Tree_Name)) +
+  geom_point()
+```
+
+
+

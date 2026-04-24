@@ -1,0 +1,25 @@
+,Extraction_ID,date_extracted,volXtra,xtra_box_label,date_ground_code,Tree_Name,specialCases
+1,5,NA,placeholder,I forgot to note,260205,PILA1b_8,NA
+2,12,NA,A,unspecified date yoghurt container,251125,PILA1c_2,NA
+3,13,NA,A,unspecified date yoghurt container,251124,PILA1c_3,NA
+4,15,NA,A,unspecified date yoghurt container,251125,PILA1c_5,NA
+5,18,NA,A,unspecified date yoghurt container,251125,PILA1c_11,confirm_label
+6,23,NA,A,25-Nov,251118,PILA2_3,NA
+7,37,NA,A,"8 August, 2025",250827,PILA4a_7,attend_to_grounds
+8,40,NA,A,"8 August, 2025",250828,PILA4a_5+6,NA
+9,41,NA,A,I forgot to note,251111,PILA5a_1,NA
+10,46,NA,D,24-Jun-25,250624,PILA5a_6,attend_to_grounds
+11,59,NA,NA,NA,251205,PILA7b_4,NA
+12,61,NA,B,27-Dec-25,251227,PILA7b_10,NA
+13,64,NA,B,5-Dec-25,251219,PILA7b_15,NA
+14,65,NA,NA,NA,251205,PILA7b_16,NA
+15,66,NA,B,5-Dec-25,251205,PILA7b_5+6,NA
+16,70,NA,B,24-Jun-25,250624,PILA8a_4,attend_to_grounds
+17,76,NA,B,24-Jun-25,250806,PILA8b_7,NA
+18,78,NA,A,24-Jun-25,250806,PILA8c_2,NA
+19,81,NA,D,"8 August, 2025",250814,PILA8c_5,confirm_label
+20,86,NA,A,"8 August, 2025",250814,PILA_PTAQ8c_1,NA
+21,87,NA,placeholder,I forgot to note,260205,PILA6a_7,NA
+22,95,NA,B,I forgot to note,260223,PILA8b_3,NA
+23,96,NA,C,I forgot to note,260223,PILA8b_8,attend_to_grounds
+24,98,,,,,,relabel_from_47
