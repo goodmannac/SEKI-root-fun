@@ -25,7 +25,7 @@ head(metaMain) # look at it
 
 # read in tab from EM Metadata entry spreadsheet with info on how much extra ground roots we have for each sample
 ```{r}
-xtra_grid = read_csv("../root_grounds_inventory/EM Metadata entry, SEKI 2024 - Xtra grounds volume.csv") # load in volumes of extra roots
+xtra_grid = read_csv("EM Metadata entry, SEKI 2024 - Xtra grounds volume.csv") # load in volumes of extra roots
 
 head(xtra_grid) # look at it
 

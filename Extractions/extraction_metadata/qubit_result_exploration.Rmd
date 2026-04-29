@@ -116,6 +116,16 @@ ggplot(concs4graph, aes(x = Plot_Name, y = original_ng_per_ul, color = mg_roots_
     axis.text.x = element_text(angle = 90)
   )
 ```
+```{r}
+ggplot((concs4graph %>% mutate(Stratum = as.character(Stratum)) %>%
+          filter(storage_type == "dry")), aes(x = Stratum, y = original_ng_per_ul, color = mg_roots_in_TD_tube)) +
+  geom_boxplot() +
+  geom_point() + 
+  theme(
+    axis.text.x = element_text(angle = 90)
+  )
+```
+
 
 ```{r}
 wetcores = e_md %>%
@@ -123,7 +133,7 @@ wetcores = e_md %>%
 
 paired_storage = e_md %>%
   filter(Tree_Name %in% wetcores$Tree_Name) %>%
-  select(c(Tree_Name, storage_type, original_ng_per_ul))
+  select(c(Tree_Name, storage_type, original_ng_per_ul, mg_roots_in_TD_tube))
 
 head(paired_storage)
 
@@ -145,6 +155,24 @@ t.test(ttest_df$original_ng_per_ul.dry, ttest_df$original_ng_per_ul.wet, paired 
 ```{r}
 ggplot(paired_storage, aes(x = storage_type, y = original_ng_per_ul, color = Tree_Name)) +
   geom_point()
+```
+
+```{r}
+paired_storage = paired_storage %>%
+  filter(!is.na(mg_roots_in_TD_tube)) %>% 
+  mutate(normalized_yield = original_ng_per_ul/as.numeric(mg_roots_in_TD_tube))
+
+ggplot(paired_storage, aes(x = storage_type, y = normalized_yield, color = Tree_Name)) +
+  geom_point()
+
+paired_storage_wide = paired_storage %>%
+  reshape(direction = "wide",
+          idvar = "Tree_Name", timevar = "storage_type")
+
+head(paired_storage_wide) 
+
+t.test(paired_storage_wide$normalized_yield.dry, paired_storage_wide$normalized_yield.wet, paired = TRUE)
+# still significantly less DNA yield from wet-stored cores than dry 
 ```
 
 
