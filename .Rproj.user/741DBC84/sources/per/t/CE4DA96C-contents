@@ -1,7 +1,7 @@
 ---
-title: "DNA_dilutions_all"
+title: "DNA_dilutions_first24"
 author: "Anna Goodman"
-date: "2026-04-22"
+date: "2026-02-15"
 output: html_document
 ---
 
@@ -14,29 +14,26 @@ library(tidyverse)
 ```
 
 ```{r}
-q_data = read_csv("../Qubit Results - raw_sample_results.csv") # read in qubit data
+q_data = read_csv("Qubit Results - raw_sample_results.csv") # read in qubit data
 # 1 row = 1 measurement. Some extractions measured multiple times, where first measurement read out of range (OOR)
 
 head(q_data)
 ```
 
 ```{r}
-# make a dataframe without OOR measurements
-oor_strings = c("High", "Low")
-in_range_qs = q_data %>%
-  filter(!(ng_per_ul %in% oor_strings | ng_per_ml %in% oor_strings)) %>% # should remove all qubits with out of range results
-  mutate(ng_per_ul = as.numeric(ng_per_ul),
-         ng_per_ml = as.numeric(ng_per_ml)) # coerce all concentration data to numeric type; it was character before because of the OOR values
+q_data = q_data %>% mutate(ng_per_ul = as.numeric(ng_per_ul)) # coerce the ng_per_ul column of this dataframe to be numeric; this will make the numbers class numeric and the "HIGH" or "LOW" entries (for OORs) NAs
 
-
-
-head(in_range_qs) # not empty
-is.numeric(in_range_qs$ng_per_ul) #it worked
-is.numeric(in_range_qs$ng_per_ml) #it worked
+is.numeric(q_data$ng_per_ul) #it worked
+q_data$ng_per_ul # confirmed HIGH and LOW are now NA
 ```
 
+```{r}
+# make a dataframe without OOR measurements
+in_range_qs = filter(q_data, !is.na(q_data$ng_per_ul)) # should remove non-numeric concentration results
 
-
+head(in_range_qs) # not empty
+nrow(in_range_qs) # 24 rows: good, one for each extraction
+```
 ```{r}
 # ok so now we need to count up all the ul consumed from each original extract
   ## from q_data
@@ -58,21 +55,6 @@ head(in_range_qs)
 ```
 
 ```{r}
-qs_ng_ul = in_range_qs %>%
-  mutate(
-    ng_per_ul = case_when(
-      !is.na(ng_per_ul) ~ ng_per_ul,
-      is.na(ng_per_ul) ~ ng_per_ml/1000
-                               )
-         ) # for each row where ng_per_ul column is empty, grab data from ng_per_ml column, convert to ng/ul, and store in  ng_per_ul column
-
-head(qs_ng_ul)
-```
-
-
-
-
-```{r}
 # extrapolate original extraction's concentration for cases where we had to measure a dilution on the qubit
 
 # convert the "dilution factor" into a proportion (original extract volume)/(H2O volume)
@@ -88,10 +70,10 @@ for (i in 1:length(in_range_qs$extraction_id)) {
   }
 }
 
-qs_ng_ul = mutate(qs_ng_ul, proportion_original = proportion) # make that vector a column in qs_ng_ul
+in_range_qs = mutate (in_range_qs, proportion_original = proportion) # make that vector a column in in_range_qs
 
 
-concs = mutate (qs_ng_ul, extrapolated_original_ng_per_ul = (1/proportion_original)*ng_per_ul) # calculate original concentration from measured concentration of dilution
+concs = mutate (in_range_qs, extrapolated_original_ng_per_ul = (1/proportion_original)*ng_per_ul) # calculate original concentration from measured concentration of dilution
 
 head(concs)
 ```
@@ -100,19 +82,10 @@ head(concs)
 
 
 ```{r}
-concs = mutate(concs, remaining_original_ul = ul_elution_original - ul_original_consumed - 10) # make new column with remaining ul of original extract, -10ul for safety/EB that never made it out of the spin column
+concs = mutate(concs, remaining_original_ul = 65 - ul_original_consumed) # make new column with remaining ul of original extract. all extracts from this extraction day eluted in 75ul of elution buffer, -10ul for safety/EB that never made it out of the spin column
 
 concs$remaining_original_ul # looks like that worked
 ```
-```{r}
-library(ggplot2)
-
-concs4graph = concs %>% mutate(date_extracted = as.character(date_extracted))
-ggplot(concs4graph, aes(x = date_extracted, y = extrapolated_original_ng_per_ul)) +
-  geom_boxplot() + geom_jitter()
-```
-
-
 
 # Now, we see what we need to do to dilute each extract to 2ng/ul 
 
@@ -190,17 +163,17 @@ concs$final_ng_per_ul # all 2s!
 ```
 ```{r}
 # tidy unnecessary columns, rename for clarity
-DNA_dilutions_all = select(concs, !c(qubit_run_id, dilution_factor, ul_original_consumed, proportion_original, ng_per_ul))  # remove columns which were only relevant as metadata for qubit measurements
+DNA_dilutions_first24 = select(concs, !c(qubit_run_id, dilution_factor, ul_original_consumed, proportion_original, ng_per_ul))  # remove columns which were only relevant as metadata for qubit measurements
 
-DNA_dilutions_all = rename(DNA_dilutions_all, original_ng_per_ul = extrapolated_original_ng_per_ul) # rename concentration of original extract for clarity
+DNA_dilutions_first24 = rename(DNA_dilutions_first24, original_ng_per_ul = extrapolated_original_ng_per_ul) # rename concentration of original extract for clarity
 
-DNA_dilutions_all = DNA_dilutions_all[order(DNA_dilutions_all$extraction_id),] # reorder dataframe by extraction id
+DNA_dilutions_first24 = DNA_dilutions_first24[order(DNA_dilutions_first24$extraction_id),] # reorder dataframe by extraction id
                                
 ```
 
 
 ```{r}
-write.csv(DNA_dilutions_all, "Results/DNA_dilutions_all.csv")
+write.csv(DNA_dilutions_first24, "Results/DNA_dilutions_first24.csv")
 ```
 
 # OR what if we did smaller volume dilutions, like into an 8-strip (200ul capacity? let's go for 180ul)
@@ -223,38 +196,31 @@ concs200 = mutate(concs200, # re-write h2o vol
 head(concs200)
 ```
 ```{r}
+# round volumes I'll be pipetting to the tenth place so I can do it with a p200
 
-concs200 = concs200 %>% 
-  
-  # round volumes I'll be pipetting to the tenth place so I can do it with a p200
-  mutate( 
-    round_original = round(ul_original_into_final, digits = 1),
-    round_H2O = round(H2O_ul, digits = 1),
-    final_vol_ul = round_H2O + round_original
-  ) %>%
-  
-  # calculate actual final concentration 
-  mutate(final_ng_per_ul = c2(extrapolated_original_ng_per_ul, round_original, final_vol_ul))
+concs200 = mutate(concs200, 
+               round_original = round(ul_original_into_final, digits = 1),
+               round_H2O = round(H2O_ul, digits = 1),
+               final_vol_ul = round_H2O + round_original
+)
+                                      
 
+# calculate actual final concentration 
+concs200 = mutate(concs200, 
+               final_ng_per_ul = c2(extrapolated_original_ng_per_ul, round_original, final_vol_ul))
 
 concs200$final_ng_per_ul # good, once I re-set the final concentration in the code chunk above to 2.01
-
-# code to check for rounding errors: 
-View(filter(concs200, final_ng_per_ul < 2)) # if final conc is set anywhere 2.01 - 2.05, 7 show up as <2ng/ul final concentration actual
 ```
-
 ```{r}
 # tidy 
-DNA_dilutions_all_200 = concs200 %>% 
-  select(!c(qubit_run_id, qubit_run_id_local, ng_per_ml, dilution_factor, ul_original_consumed, proportion_original, ng_per_ul)) %>% # remove columns which were only relevant as metadata for qubit measurements
-  rename(original_ng_per_ul = extrapolated_original_ng_per_ul,
-         ul_H2O_into_final = H2O_ul) # rename concentration of original extract for clarity
+DNA_dilutions_first24_200 = select(concs200, !c(qubit_run_id, dilution_factor, ul_original_consumed, proportion_original, ng_per_ul)) # remove columns which were only relevant as metadata for qubit measurements
 
-DNA_dilutions_all_200 = DNA_dilutions_all_200[order(DNA_dilutions_all_200$extraction_id),] # reorder dataframe by extraction id
+DNA_dilutions_first24_200 = rename(DNA_dilutions_first24_200, original_ng_per_ul = extrapolated_original_ng_per_ul) # rename concentration of original extract for clarity
+
+DNA_dilutions_first24_200 = DNA_dilutions_first24_200[order(DNA_dilutions_first24_200$extraction_id),] # reorder dataframe by extraction id
 
 ```
 
 ```{r}
-write.csv(DNA_dilutions_all_200, "Results/DNA_dilutions_all_striptubes.csv")
+write.csv(DNA_dilutions_first24_200, "Results/DNA_dilutions_first24_striptubes.csv")
 ```
-

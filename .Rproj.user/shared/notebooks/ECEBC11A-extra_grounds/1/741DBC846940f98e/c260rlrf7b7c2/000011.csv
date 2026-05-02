@@ -1,0 +1,3 @@
+"0",""
+"0","xtra_grid = xtra_grid[, 1:7] # trim to exclude notes columns"
+"0","head(xtra_grid)"

@@ -1,0 +1,121 @@
+---
+title: "Plan_lpboot"
+output: html_document
+---
+
+```{r}
+library(tidyverse)
+```
+
+```{r}
+e_md = read.csv("../Extractions/extraction_metadata/Results/extraction_metadata_w_dilutions.csv")
+```
+
+```{r}
+DNA_avail = e_md %>%
+  mutate(ng_in_stock = original_ng_per_ul*remaining_original_ul) %>% # this is an under-estimate for extracts which read OOR-high; DNAin remaining 1:3 dilutions of these is unaccounted for 
+  filter(!is.na(ng_in_stock))
+
+quantile(DNA_avail$ng_in_stock) # quick look at distribution of available DNA mass
+
+threshold = quantile(DNA_avail$ng_in_stock, 0.25) # store first quantile; see if we can do this without using any samples we have this little DNA for
+```
+
+```{r}
+
+redoable = DNA_avail %>%
+  filter(ng_in_stock>(threshold))
+
+nrow(redoable)
+
+```
+
+# account for all the samples that shouldn't be in LP_BOOT for one reason or another
+```{r}
+# extraction ids for which LP was done successfully in LPA
+lp_done = c(2, 3, 4, 6, 14, 21, 25, 29, 63, 67, 68, 74, 75, 80, 88) # see "LPA - all" in my SEKI OneNote
+# extraction ids I already diluted to 2ng/ul as a part of LPA, but didn't finish in LPA
+dil_done = c(2, 3, 4, 6, 14, 21, 25, 29, 31, 35, 38, 43, 45, 51, 52, 60, 63, 67, 68, 71, 74, 75, 80, 88)
+
+need_combo = c(37, 56) # see "47, 56 extraction ID mix-up" in my SEKI OneNote
+
+need_concentration = which(e_md$original_ng_per_ul < 2)
+
+lp_boot_candidates = redoable %>%
+  filter(!(Extraction_ID %in% lp_done)) %>%
+  filter(!(Extraction_ID %in% need_combo)) %>%
+  filter(!(Extraction_ID %in% need_concentration)) %>%
+  filter(!(Extraction_ID %in% dil_done))
+
+nrow(lp_boot_candidates)
+```
+
+```{r}
+lp_boot_candidates = lp_boot_candidates[order(lp_boot_candidates$ng_in_stock, decreasing = TRUE),] # reorder dataframe by ng of DNA availible
+bootSamples = lp_boot_candidates[1:50,] # pick out 50 at the top of this list (with most DNA availible) (22 for evan and 28 for me). I want to do two sets of bootSamples; if I do 2 strips per, w MMC and NegC each, that gives me 14+14 = 28
+
+head(bootSamples)
+```
+
+```{r}
+lpboot_dilplans = bootSamples %>%
+  select(c(Extraction_ID, date_extracted, original_ng_per_ul, ul_elution_original, remaining_original_ul, dilution_vol_ul, ul_H2O_into_final, ul_original_into_final, round_original, round_H2O, dilution_ng_per_ul, remaining_original_ul_post_dil))
+
+lpboot_dilplan_simple = lpboot_dilplans %>%
+  select(c(Extraction_ID, round_original, round_H2O))
+
+lpboot_dilplan_simple = lpboot_dilplan_simple[order(lpboot_dilplan_simple$Extraction_ID, decreasing = FALSE),] # reorder dataframe by Extraction_ID for readability
+```
+
+```{r}
+evanBoot_dilplan = lpboot_dilplan_simple[1:22,]
+annaBoot_dilplan = lpboot_dilplan_simple[23:50,] 
+
+# doube check that they're mutually exclusive
+evanBoot_dilplan$Extraction_ID %in% annaBoot_dilplan$Extraction_ID
+annaBoot_dilplan$Extraction_ID %in% evanBoot_dilplan$Extraction_ID 
+```
+
+
+
+```{r}
+write.csv(evanBoot_dilplan, "Results/EVAN_planned_LP-BOOT_dilutions.csv")
+write.csv(annaBoot_dilplan, "Results/ANNA_planned_LP-BOOT_dilutions.csv")
+```
+
+
+```{r}
+barcodes_still_to_plan = DNA_avail %>%
+  filter(!Extraction_ID %in% dil_done) %>% # because all the ones I diluted in LPA got barcodes assigned, whether I finished the LP or not
+  filter(!Extraction_ID %in% lpboot_dilplans$Extraction_ID)
+
+barcodes_still_to_plan$Extraction_ID
+length(barcodes_still_to_plan$Extraction_ID)
+```
+
+```{r}
+barcodes_planned = read.csv("quickcheck.csv")
+barcodes_planned = barcodes_planned$Extraction_ID
+length(barcodes_planned)
+length(unique(barcodes_planned)) 
+# ok nice. these two lengths are the same, so we don't have any repeats
+
+
+
+xids_w_barcodes = barcodes_planned %>%
+  as.numeric() %>%
+  na.omit()
+length(xids_w_barcodes)
+
+xids_w_barcodes = xids_w_barcodes[order(xids_w_barcodes, decreasing = FALSE)] # reorder by Extraction_ID for readability
+xids_w_barcodes
+
+xids_missing = which(!(1:99 %in% xids_w_barcodes))
+xids_missing # just 56 and 96, which is on purpouse
+
+
+```
+
+
+
+

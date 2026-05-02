@@ -174,6 +174,54 @@ head(paired_storage_wide)
 t.test(paired_storage_wide$normalized_yield.dry, paired_storage_wide$normalized_yield.wet, paired = TRUE)
 # still significantly less DNA yield from wet-stored cores than dry 
 ```
+```{r}
+#re-do earlier figures with normalized dna yield
+
+e_md_norm = e_md %>%
+  mutate(mg_roots_in_TD_tube = as.numeric(mg_roots_in_TD_tube), original_ng_per_ul = as.numeric(original_ng_per_ul)) %>% 
+  filter(!(is.na(mg_roots_in_TD_tube))) %>% 
+  filter(!(is.na(original_ng_per_ul))) %>%
+  mutate(normalized_yield = original_ng_per_ul/mg_roots_in_TD_tube)
+
+```
+
+
+```{r}
+# compare root mass input to extraction with yield, by plot
+concs4graph = e_md_norm %>% mutate(date_extracted = as.character(date_extracted)) %>%
+  mutate(mg_roots_in_TD_tube = as.numeric(mg_roots_in_TD_tube))
+
+ggplot(concs4graph, aes(x = mg_roots_in_TD_tube, y = normalized_yield, color = Plot_Name)) +
+  geom_smooth(method = "lm") +
+  geom_point()
+
+ggplot(concs4graph, aes(x = Plot_Name, y = normalized_yield, color = mg_roots_in_TD_tube)) +
+  geom_boxplot() +
+  geom_point() + 
+  theme(
+    axis.text.x = element_text(angle = 90)
+  )
+```
+```{r}
+ggplot((concs4graph %>% mutate(Stratum = as.character(Stratum)) %>%
+          filter(storage_type == "dry")), aes(x = Stratum, y = normalized_yield, color = mg_roots_in_TD_tube)) +
+  geom_boxplot() +
+  geom_point() + 
+  theme(
+    axis.text.x = element_text(angle = 90)
+  )
+```
+
+
+```{r}
+ggplot((concs4graph), aes(y = normalized_yield)) +
+  geom_boxplot() 
+```
+```{r}
+ggplot((concs4graph), aes(y = original_ng_per_ul)) +
+  geom_boxplot()
+```
+
 
 
 

@@ -1,0 +1,6 @@
+"0","# update remaining_original_ul so it's what it will be once we do the 2ng/ul dilutions"
+"0","extraction_metadata = mutate(extraction_metadata, remaining_original_ul = remaining_original_ul - round_original)"
+"0","extraction_metadata = rename(extraction_metadata, dilution_vol_ul = final_vol_ul, dilution_ng_per_ul = final_ng_per_ul)"
+"0","extraction_metadata = select(extraction_metadata, !c(H2O_ul, ul_original_into_final, round_original, round_H2O))"
+"0",""
+"0","head(extraction_metadata)"

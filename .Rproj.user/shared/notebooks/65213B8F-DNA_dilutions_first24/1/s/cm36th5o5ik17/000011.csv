@@ -1,0 +1,7 @@
+"0","# tidy "
+"0","DNA_dilutions_first24_200 = select(concs200, !c(qubit_run_id, dilution_factor, ul_original_consumed, proportion_original, ng_per_ul)) # remove columns which were only relevant as metadata for qubit measurements"
+"0",""
+"0","DNA_dilutions_first24_200 = rename(DNA_dilutions_first24_200, original_ng_per_ul = extrapolated_original_ng_per_ul) # rename concentration of original extract for clarity"
+"0",""
+"0","DNA_dilutions_first24_200 = DNA_dilutions_first24_200[order(DNA_dilutions_first24_200$extraction_id),] # reorder dataframe by extraction id"
+"0",""

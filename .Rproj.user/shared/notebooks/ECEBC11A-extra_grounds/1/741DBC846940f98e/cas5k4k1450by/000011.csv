@@ -1,0 +1,2 @@
+"0","xtra_table = select(xtra_grid, c(`Box dated`, Extraction_ID, volXtra)) # move to dataframe that doesn't have the grid in it"
+"0","head(xtra_table)"

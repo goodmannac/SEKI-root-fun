@@ -79,7 +79,7 @@ done_extractions = select (done_extractions, !c(`...1`)) #  `...1` may appear as
 
 # update remaining_original_ul so it's what it will be once we do the 2ng/ul dilutions
 done_extractions = done_extractions %>%
-  mutate(remaining_original_ul = remaining_original_ul - round_original) %>%
+  mutate(remaining_original_ul_post_dil = remaining_original_ul - round_original) %>%
   rename(dilution_vol_ul = final_vol_ul, dilution_ng_per_ul = final_ng_per_ul)
 
 extraction_metadata = metaMain %>%

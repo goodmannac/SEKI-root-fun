@@ -1,0 +1,2 @@
+"0","already_good = filter(concs, concs$final_vol_ul <= 190) # set aside cases where our current dilution plan would fit in a 200ul strip tube "
+"0","head(already_good)"

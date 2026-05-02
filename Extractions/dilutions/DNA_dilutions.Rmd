@@ -134,7 +134,7 @@ m2 = m2, so c1v1 = c2v2, so (c1v1)/c2 = v2
 and H2O needed = v2-v1
 
 ```{r}
-# calculate total volume of diluted extract
+# calculate final volume if we dilute all original extract
 v2 = function(c1, v1, c2) {
   v2 = (c1*v1)/c2
   return(v2)
@@ -148,78 +148,44 @@ head(concs)
 
 ```
 
+
+# # Dilutions for strip tubes (final vol 190ul)
 ```{r}
-# some big numbers in there. want to use all 1.5 mL tubes for these dilutions
-tube_fit_problem = filter(concs, concs$final_vol_ul >= 1450)
-tube_fit_problem #51 is pushing it but will probably fit. #3 will not
+# we want the final dilution to fit in a strip tube (max v2 possible <190ul)
 
-concs = mutate(concs, ul_original_into_final = remaining_original_ul) # make a separate column for v1, showing what volume of original extract should go into the final dilution. set default as all remaining_original_ul
-
-# chance the ul_original_into_final volume, just for #3.
-
-# constrain v2 and find v1; (c2v2)/c1 = v2
+# so we constrain v2 and find v1; (c2v2)/c1 = v2
 v1 = function(c2, v2, c1) {
   v1 = (c2*v2)/c1
   return(v1)
 }
 
-index = which(concs$extraction_id == 3) # store the index of extraction ID 3
-concs[index, "final_vol_ul"] = 1450 # set final vol of dilution
-
-concs[index, "ul_original_into_final"] = v1(2, 
-                                                         concs$final_vol_ul[index], # final vol set above
-                                                         concs$extrapolated_original_ng_per_ul[index]) # replace the v1 value in concs for #3
-
-concs = mutate(concs, # re-write h2o 
-               H2O_ul = final_vol_ul - ul_original_into_final)
-head(concs)
-```
-
-```{r}
-# calculate final concentration to double-check
-
-c2 = function(c1, v1, v2) {
-  c2 = (c1*v1)/v2
-  return(c2)
-}
-
-concs = mutate(concs, 
-               final_ng_per_ul = c2(extrapolated_original_ng_per_ul, ul_original_into_final, final_vol_ul))
-
-concs$final_ng_per_ul # all 2s!
-```
-```{r}
-# tidy unnecessary columns, rename for clarity
-DNA_dilutions_all = select(concs, !c(qubit_run_id, dilution_factor, ul_original_consumed, proportion_original, ng_per_ul))  # remove columns which were only relevant as metadata for qubit measurements
-
-DNA_dilutions_all = rename(DNA_dilutions_all, original_ng_per_ul = extrapolated_original_ng_per_ul) # rename concentration of original extract for clarity
-
-DNA_dilutions_all = DNA_dilutions_all[order(DNA_dilutions_all$extraction_id),] # reorder dataframe by extraction id
-                               
-```
-
-
-```{r}
-write.csv(DNA_dilutions_all, "Results/DNA_dilutions_all.csv")
-```
-
-# OR what if we did smaller volume dilutions, like into an 8-strip (200ul capacity? let's go for 180ul)
-```{r}
-already_good = filter(concs, concs$final_vol_ul <= 190) # set aside cases where our current dilution plan would fit in a 200ul strip tube 
+already_good = filter(concs, concs$final_vol_ul <= 190) # set aside cases where diluting all original extract would fit into a strip tube 
 head(already_good)
 
 concs200 = concs # make a copy of our data table to work in
 
-index = which(!(concs$extraction_id %in% (already_good$extraction_id))) # find indicies of extractions where we'd need a new dilution plan to fit into 200ul strip tubes
-concs200[index, "final_vol_ul"] = 190 # set final vol of dilution, 200ul - 10ul for headspace
+diluting_whole_original = which(!(concs$extraction_id %in% (already_good$extraction_id))) # find indicies of extractions a dilution of the whole original volume will fit in a 200ul tube
+diluting_aliquot = which(!(concs$extraction_id %in% (already_good$extraction_id))) # find indicies of extractions where we'd to dilute an aliquot to fit into 200ul strip tubes
 
-# for extractions with these indices, find volume of original extraction we need to make a 2ng/ul dilution with a final vol of 190ul
-concs200[index, "ul_original_into_final"] = v1(2.01, # a little more than 2, so rounding errors don't push the final concentrations below 2
-                                              concs200$final_vol_ul[index], # final vol set above
-                                              concs200$extrapolated_original_ng_per_ul[index]) # original extract concentrations
+concs200 = concs200 %>% 
+  mutate(final_vol_ul = case_when(
+    concs$extraction_id %in% (already_good$extraction_id) ~ final_vol_ul, # for extractions for which a dilution of the whole original volume will fit in a 200ul tube, set final vol of dilution as the final volume we find if we dilute the whole original extract
+    !(concs$extraction_id %in% (already_good$extraction_id)) ~ 190)) # for extractions where we'd to dilute an aliquot to fit into 200ul strip tubes, set final vol of dilution to 190ul (200ul - 10ul for headspace)
 
-concs200 = mutate(concs200, # re-write h2o vol
+
+# concs200[diluting_whole_original, "final_vol_ul"] = final_vol_if_all_diluted # for these, set final vol of dilution as the final volume we find if we dilute the whole original extract
+# concs200[diluting_aliquot, "final_vol_ul"] = 190 # for these, set final vol of dilution to 190ul. 200ul - 10ul for headspace
+
+
+# for extractions with these indices, find volume of original extraction we need to make a 2ng/ul dilution the final volume set above
+concs200 = concs200 %>%
+  mutate(ul_original_into_final = v1(2.01, # a little more than 2, so rounding errors don't push the final concentrations below 2
+                                              final_vol_ul, # final vol set above
+                                              extrapolated_original_ng_per_ul) # original extract concentrations
+  ) %>%
+  mutate(concs200, # re-write h2o vol
                H2O_ul = final_vol_ul - ul_original_into_final)
+
 head(concs200)
 ```
 ```{r}
@@ -240,15 +206,16 @@ concs200 = concs200 %>%
 concs200$final_ng_per_ul # good, once I re-set the final concentration in the code chunk above to 2.01
 
 # code to check for rounding errors: 
-View(filter(concs200, final_ng_per_ul < 2)) # if final conc is set anywhere 2.01 - 2.05, 7 show up as <2ng/ul final concentration actual
+head(filter(concs200, final_ng_per_ul < 2)) # if final conc is set anywhere 2.01 - 2.05, 7 show up as <2ng/ul final concentration actual
 ```
 
 ```{r}
 # tidy 
 DNA_dilutions_all_200 = concs200 %>% 
-  select(!c(qubit_run_id, qubit_run_id_local, ng_per_ml, dilution_factor, ul_original_consumed, proportion_original, ng_per_ul)) %>% # remove columns which were only relevant as metadata for qubit measurements
-  rename(original_ng_per_ul = extrapolated_original_ng_per_ul,
-         ul_H2O_into_final = H2O_ul) # rename concentration of original extract for clarity
+  select(!c(qubit_run_id, qubit_run_id_local, ng_per_ml, dilution_factor, proportion_original, ng_per_ul)) %>% # remove columns which were only relevant as metadata for qubit measurements
+  rename(original_ng_per_ul = extrapolated_original_ng_per_ul, # rename concentration of original extract for clarity
+         ul_H2O_into_final = H2O_ul,
+         ul_original_used_for_qubit = ul_original_consumed) # 
 
 DNA_dilutions_all_200 = DNA_dilutions_all_200[order(DNA_dilutions_all_200$extraction_id),] # reorder dataframe by extraction id
 

@@ -1,0 +1,27 @@
+{
+    "id": "C4BB20D5",
+    "path": "~/Bogar Lab/SEKI/root_extractions_lib_prep/root_grounds_inventory/make_extraction_metadata_draft.Rmd",
+    "project_path": "root_grounds_inventory/make_extraction_metadata_draft.Rmd",
+    "type": "r_markdown",
+    "hash": "3936729915",
+    "contents": "",
+    "dirty": false,
+    "created": 1771274706159.0,
+    "source_on_save": false,
+    "relative_order": 7,
+    "properties": {
+        "source_window_id": "",
+        "Source": "Source",
+        "cursorPosition": "5,3",
+        "scrollLine": "23",
+        "last_setup_crc32": "6940f98ebb338d19"
+    },
+    "folds": "",
+    "lastKnownWriteTime": 1771282692,
+    "encoding": "UTF-8",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1771282692257,
+    "read_only": false,
+    "read_only_alternatives": []
+}

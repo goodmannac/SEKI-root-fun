@@ -1,0 +1,99 @@
+---
+title: "Extra grounds inventory and extraction metadata"
+author: "Anna Goodman"
+date: "2026-02-16"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+```
+
+```{r}
+xtra_grid = read_csv("EM Metadata entry, SEKI 2024 - Xtra grounds volume.csv") # load in volumes of extra roots
+
+head(xtra_grid)
+
+xtra_grid = xtra_grid[, 1:7] # trim to exclude notes columns
+head(xtra_grid)
+```
+
+```{r}
+xtra_grid = mutate(xtra_grid, volXtra = "placeholder")
+for (i in 1:length(xtra_grid$Extraction_ID)) {
+  if (is.na(xtra_grid$A[i]) == FALSE) {
+    xtra_grid$volXtra[i] = "A"
+  } else if (is.na(xtra_grid$B[i]) == FALSE) {
+    xtra_grid$volXtra[i] = "B"
+  } else if (is.na(xtra_grid$C[i]) == FALSE) {
+    xtra_grid$volXtra[i] = "C"
+  } else if (is.na(xtra_grid$D[i]) == FALSE) {
+    xtra_grid$volXtra[i] = "D"
+  } else if (is.na(xtra_grid$E[i]) == FALSE) {
+    xtra_grid$volXtra[i] = "E"
+  }
+}
+head(xtra_grid)
+```
+
+```{r}
+xtra_grid = xtra_grid[rev(order(xtra_grid$Extraction_ID)),] # reorder dataframe by extraction id, low to high
+xtra_grid = xtra_grid[rev(order(xtra_grid$volXtra)),] # reorder dataframe by volXtra, with most volume first
+head(xtra_grid)
+```
+
+```{r}
+xtra_table = select(xtra_grid, c(`Box dated`, Extraction_ID, volXtra)) # move to dataframe that doesn't have the grid in it
+head(xtra_table)
+```
+
+```{r}
+# note which ones have already been extracted
+done_extractions = read_csv("../Extractions/Results/DNA_dilutions_first24_striptubes.csv")
+good_extractions = done_extractions$extraction_id # all of these were good
+
+xtra_table = mutate(xtra_table, date_extracted = "not yet") # default to not yet
+for (i in 1:length(xtra_table$Extraction_ID)) {
+  if (xtra_table$Extraction_ID[i] %in% good_extractions) {
+    done_index = which(done_extractions$extraction_id == xtra_table$Extraction_ID[i])
+    xtra_table$date_extracted[i] = done_extractions$date_extracted[done_index]
+  } else {
+    
+  }
+}
+
+head(xtra_table)
+```
+
+```{r}
+xtra_table = rename(xtra_table, xtra_box_label = `Box dated`)
+```
+
+
+
+Add in the rest of the extraction metadata
+```{r}
+done_extractions = select (done_extractions, !c(date_extracted, `...1`)) # date_extracted was causing joining issues and it's already in xtra_table. `...1` is an artifact
+extraction_metadata = left_join(xtra_table, done_extractions, join_by("Extraction_ID" == "extraction_id"))
+
+head(extraction_metadata)
+```
+
+```{r}
+# update remaining_original_ul so it's what it will be once we do the 2ng/ul dilutions
+extraction_metadata = mutate(extraction_metadata, remaining_original_ul = remaining_original_ul - round_original)
+extraction_metadata = rename(extraction_metadata, dilution_vol_ul = final_vol_ul, dilution_ng_per_ul = final_ng_per_ul)
+extraction_metadata = select(extraction_metadata, !c(H2O_ul, ul_original_into_final, round_original, round_H2O))
+
+head(extraction_metadata)
+```
+
+
+
+
+
+

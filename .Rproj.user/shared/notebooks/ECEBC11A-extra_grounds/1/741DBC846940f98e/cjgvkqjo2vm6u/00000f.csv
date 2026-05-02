@@ -1,0 +1,3 @@
+"0","xtra_grid = xtra_grid[rev(order(xtra_grid$Extraction_ID)),] # reorder dataframe by extraction id, low to high"
+"0","xtra_grid = xtra_grid[rev(order(xtra_grid$volXtra)),] # reorder dataframe by volXtra, with most volume first"
+"0","head(xtra_grid)"

@@ -1,0 +1,4 @@
+"0","# make a dataframe without OOR measurements"
+"0","in_range_qs = filter(q_data, !is.na(q_data$ng_per_ul)) # should remove non-numeric concentration results"
+"0",""
+"0","head(in_range_qs) # not empty"
