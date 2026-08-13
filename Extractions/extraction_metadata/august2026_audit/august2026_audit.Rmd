@@ -1,0 +1,350 @@
+---
+title: "august2026_audit"
+output: html_document
+---
+
+```{r}
+library(tidyverse)
+library(googledrive)
+```
+
+```{r}
+mainMetadata_dribble = drive_get("EM Metadata entry, SEKI 2024", shared_drive = 'Bogar Lab')
+
+mainMetadata_dribble
+```
+```{r}
+local_path <- paste0("Inputs/EM Metadata entry, SEKI 2024_downloaded-", format(Sys.Date(), "%Y%m%d"), ".csv") #define what this local file name will be, with today's date
+
+drive_download(mainMetadata_dribble, type = "csv", path = local_path, overwrite = TRUE) # overwrite = TRUE means that if you download this file twice on the same day, the first version will be overwritten by the second. If you download this file again on a different day (by running this whole code chunk), it will not be overwritten, because the date will have been updated and the local path will be different
+```
+```{r}
+mainMetadata_dribble = drive_get("EM Metadata entry, SEKI 2024", shared_drive = 'Bogar Lab')
+
+mainMetadata_dribble
+```
+```{r}
+xtra_roots_dribble = drive_get("xtra_root_grounds_volume", shared_drive = 'Bogar Lab')
+
+xtra_roots_dribble
+
+local_path <- paste0("Inputs/xtra_root_grounds_volume_downloaded", format(Sys.Date(), "%Y%m%d"), ".csv") 
+
+drive_download(xtra_roots_dribble, type = "csv", path = local_path, overwrite = TRUE)
+```
+```{r}
+
+xtra_rootscsv = read.csv("Inputs/xtra_root_grounds_volume_downloaded20260812.csv") 
+
+
+# metadatacsv = read.csv("Inputs/EM Metadata entry, SEKI 2024_downloaded-20260812.csv") TEMPORARY: anna re-running with the local, "AG direct edit" version on her computer
+
+metadatacsv = read.csv("Inputs/EM Metadata entry, SEKI 2024 - AG_direct_edit_22April2026.csv")
+```
+
+
+```{r}
+xtra_grid = mutate(xtra_rootscsv, volXtra = "placeholder") # made a column called volXtra
+
+head(xtra_grid)
+
+for (i in 1:length(xtra_grid$Extraction_ID)) {
+  if ((xtra_grid$A[i]) == "x") {
+    xtra_grid$volXtra[i] = "A"
+  } else if ((xtra_grid$B[i]) == "x") {
+    xtra_grid$volXtra[i] = "B"
+  } else if ((xtra_grid$C[i]) == "x") {
+    xtra_grid$volXtra[i] = "C"
+  } else if ((xtra_grid$D[i]) == "x") {
+    xtra_grid$volXtra[i] = "D"
+  } else if ((xtra_grid$E[i]) == "x") {
+    xtra_grid$volXtra[i] = "E"
+  }
+}
+head(xtra_grid)
+
+xtra_grid = xtra_grid %>% # make a copy of xtra_grid, with the following changes:
+  select(c(Box.dated, Extraction_ID, volXtra)) # only keep the columns with these names!
+      # the c() makes a "vector" (basically, a list) of all the columns we're keeping. you wouldn't need it if you were just keeping one column.
+
+head(xtra_grid)
+
+xtra_grid = xtra_grid %>%
+  filter(Box.dated != "totals: ") %>%
+  filter(Box.dated != "percents:")
+
+```
+Join the main metadata table with the extra root volumes
+```{r}
+xtra_grid$Extraction_ID <- as.character(xtra_grid$Extraction_ID) # 
+
+Joint_table = left_join(metadatacsv,xtra_grid,by = "Extraction_ID")
+```
+
+check for joining errors:
+```{r}
+quality_check = Joint_table %>% # make a copy of Joint_table, with the following modifications:
+  select(c(Extraction_ID, date_ground_english, volXtra, Box.dated)) # just look at these columns 
+
+# View(quality_check) # ok this looks good, but I think we lost one of the two 39s in the xtra grounds sheet and I don't know which one. re-trying with full_join
+```
+
+resolving join errors
+```{r}
+# There were two Extraction_ID 39s in the extra grounds sheet; based on dates, one of them is actually 59 (which is otherwise absent from that sheet.) Verified by looking in freezer on 11 August 2026, EF and AG.
+  # So we know that #59 has "A" volXtra and is in Box.dated 5 December, 2025
+
+Joint_table = Joint_table %>%
+  filter(!(Extraction_ID == "39" & Box.dated == "5 December 2025")) %>%
+  mutate(volXtra = case_when(
+    Extraction_ID == "59" ~ "A",
+    .default = volXtra
+  )) %>%
+    mutate(Box.dated = case_when(
+    Extraction_ID == "59" ~ "5 December 2025",
+    .default = Box.dated
+  ))
+  
+```
+
+Remove all columns where extraction id isn't numeric, make all extraciton ids numeric
+```{r}
+Joint_table = Joint_table %>%
+  mutate(Extraction_ID = as.numeric(Extraction_ID)) %>%
+  filter(!is.na(Extraction_ID))
+```
+Keep looking for joining errors
+```{r}
+Joint_table = Joint_table %>%
+  arrange(Extraction_ID)
+
+98 %in% Joint_table$Extraction_ID #there's a 98 in the joined version
+"98" %in% metadatacsv$Extraction_ID #it was also in the metadatacsv
+98 %in% Joint_table$xtra_rootscsv #it was not in the xtrarootscsv
+
+anyDuplicated(Joint_table$Extraction_ID) #should give me the index (row number) of a duplicated value
+
+Joint_table$Extraction_ID[anyDuplicated(Joint_table$Extraction_ID)]
+```
+
+check for joining errors:
+```{r}
+quality_check = Joint_table %>% # make a copy of Joint_table, with the following modifications:
+  select(c(Extraction_ID, date_ground_english, volXtra, Box.dated)) # just look at these columns 
+
+# View(quality_check) # ok this looks good, but I think we lost one of the two 39s in the xtra grounds sheet and I don't know which one. re-trying with full_join
+```
+
+resolving join errors
+```{r}
+# There were two Extraction_ID 47s in the extra grounds sheet; based on dates, one of them is actually 98 (which is otherwise absent from that sheet.) This is related to the 47->98 labeling switch, documented on Anna's OneNote and also in the AG direct edit version of the main metadata sheet. 
+  # So we know that #98 has "D" volXtra and has "I forgot to note" in Box.dated
+
+Joint_table = Joint_table %>%
+  filter(!(Extraction_ID == "47" & Box.dated == "I forgot to note")) %>%
+  mutate(volXtra = case_when(
+    Extraction_ID == "98" ~ "D",
+    .default = volXtra
+  )) %>%
+    mutate(Box.dated = case_when(
+    Extraction_ID == "98" ~ "I forgot to note",
+    .default = Box.dated
+  ))
+  
+```
+
+Keep looking for joining errors
+```{r}
+anyDuplicated(Joint_table$Extraction_ID) #should give me the index (row number) of a duplicated value
+
+Joint_table$Extraction_ID[anyDuplicated(Joint_table$Extraction_ID)] # should give me the value of Extraction_ID in that row
+```
+
+resolving join errors
+```{r}
+# There were two Extraction_ID 63s in the extra grounds sheet; based on dates, one of them is actually 65 (which is otherwise absent from that sheet.) Verified by looking in freezer on 11 August 2026, EF and AG.
+  # So we know that #65 has "B" volXtra and has "5 Decemeber 2025" in Box.dated
+
+Joint_table = Joint_table %>%
+  filter(!(Extraction_ID == "63" & volXtra == "B")) %>%
+  mutate(volXtra = case_when(
+    Extraction_ID == "65" ~ "B",
+    .default = volXtra
+  )) %>%
+    mutate(Box.dated = case_when(
+    Extraction_ID == "65" ~ "5 December 2025",
+    .default = Box.dated
+  ))
+  
+```
+
+Keep looking for joining errors
+```{r}
+anyDuplicated(Joint_table$Extraction_ID) #should give me the index (row number) of a duplicated value
+
+Joint_table$Extraction_ID[anyDuplicated(Joint_table$Extraction_ID)] # should give me the value of Extraction_ID in that row
+
+quality_check = Joint_table %>% # make a copy of Joint_table, with the following modifications:
+  select(c(Extraction_ID, date_ground_english, volXtra, Box.dated)) # just look at these columns 
+
+```
+
+```{r}
+dilutions_dataframe = read_csv("../../dilutions/Results/DNA_dilutions_all_striptubes.csv") %>%
+  rename(Extraction_ID = extraction_id)
+```
+
+Join this with the dilutions I planned 
+```{r}
+Joint_w_dil = left_join(Joint_table, dilutions_dataframe, by = "Extraction_ID")
+
+quality_check = Joint_w_dil %>% # make a copy of Joint_w_dil, with the following modifications:
+  select(c(Extraction_ID, date_ground_english, volXtra, remaining_original_ul, round_original)) # just look at these columns; 
+          # "remaining_original_ul" was how much DNA extract we had before the dilutions, 
+          # "round_original" was how much DNA extract I planned to use for the dilutions
+```
+
+Ok, which ones have already been diluted?
+We need to find 
+- which extraction IDs Anna Diluted for LPA and LPBoot
+- which extraction IDs Evan diluted for LPBoot and LPC, LPD
+
+Some of this info exists on the drive in a library prep progress tracker document!
+```{r}
+LP_progress_dribble = drive_get("SEKI_Libraryprep_Progress", shared_drive = 'Bogar Lab')
+
+LP_progress_dribble
+```
+```{r}
+local_path <- paste0("Inputs/SEKI_Libraryprep_Progress_downloaded-", format(Sys.Date(), "%Y%m%d"), ".csv") #define what this local file name will be, with today's date
+
+drive_download(LP_progress_dribble, type = "csv", path = local_path, overwrite = TRUE) # overwrite = TRUE means that if you download this file twice on the same day, the first version will be overwritten by the second. If you download this file again on a different day (by running this whole code chunk), it will not be overwritten, because the date will have been updated and the local path will be different
+
+LP_progress = read_csv(local_path)
+```
+
+Which extraction IDs have been diluted, and how many times? And how much of the original volume is left now?
+
+this chunk has bugs; AG wrote most of it and gemini wrote some
+```{r}
+LP_summary <- LP_progress %>%
+
+  group_by(Extraction_ID) %>%
+  summarize(
+    # 1. Your original summary metrics
+    dilutions_completed = sum(!is.na(Date_DNA_Dilution)),
+    LP_sucessful = case_when(
+      any(`Sucsesfull-prep_(Y/N)` == "Y", na.rm = TRUE) ~ "Y",
+      any(is.na(`Sucsesfull-prep_(Y/N)`)) ~ "TBD",
+      all(`Sucsesfull-prep_(Y/N)` == "N", na.rm = TRUE) ~ "N",
+      TRUE ~ "TBD"
+    ),
+    
+    # 2. Concatenate all remaining original columns
+    across(
+      -c(Date_DNA_Dilution, `Sucsesfull-prep_(Y/N)`), 
+      ~ paste(na.omit(unique(.x)), collapse = "; ")
+    ),
+    .groups = "drop"
+  ) %>%
+  mutate(Extraction_ID = as.numeric(Extraction_ID)) %>%
+  filter(!is.na(Extraction_ID))
+
+
+Joint_w_dil_progress = Joint_w_dil %>% left_join(LP_summary, by = "Extraction_ID") %>%
+  mutate(ul_used_for_dilutions = dilutions_completed * round_original) %>%
+  mutate(remaining_original_ul = remaining_original_ul - ul_used_for_dilutions)
+```
+
+this version is gemini, based on my original, w a few edits from me
+```{r}
+LP_summary <- LP_progress %>%
+  group_by(Extraction_ID) %>%
+  summarize(
+    dilutions_completed = sum(!is.na(Date_DNA_Dilution)),
+    LP_sucessful = case_when(
+      any(`Sucsesfull-prep_(Y/N)` == "Y", na.rm = TRUE) ~ "Y",
+      all(`Sucsesfull-prep_(Y/N)` == "N", na.rm = TRUE) ~ "N",
+      .default = "TBD",
+      .unmatched = "default"
+    ),
+    
+    # Only paste character/text columns to prevent turning numbers into strings
+    across(
+      where(is.character) & -c(`Sucsesfull-prep_(Y/N)`), 
+      ~ paste(na.omit(unique(.x)), collapse = "; ")
+    ),
+    .groups = "drop"
+  ) %>%
+  mutate(Extraction_ID = readr::parse_number(as.character(Extraction_ID))) %>%
+  filter(!is.na(Extraction_ID))
+
+
+Joint_w_dil_progress <- Joint_w_dil %>% 
+  mutate(
+    Extraction_ID = readr::parse_number(as.character(Extraction_ID)),
+    round_original = as.numeric(round_original) # Ensure numeric type before join
+  ) %>%
+  left_join(LP_summary, by = "Extraction_ID") %>%
+  mutate(
+    ul_used_for_dilutions = dilutions_completed * round_original,
+    remaining_original_ul = remaining_original_ul - ul_used_for_dilutions
+  )
+```
+
+```{r}
+LP_summary <- LP_progress %>%
+  group_by(Extraction_ID) %>%
+  summarize(
+    dilutions_completed = sum(!is.na(Date_DNA_Dilution)),
+    LP_sucessful = case_when(
+      any(`Sucsesfull-prep_(Y/N)` == "Y", na.rm = TRUE) ~ "Y",
+      all(`Sucsesfull-prep_(Y/N)` == "N", na.rm = TRUE) ~ "N",
+      .default = "TBD",
+      .unmatched = "default"
+    ),
+    
+    # Explicitly concatenate Date_DNA_Dilution and other columns
+    across(
+      -c(`Sucsesfull-prep_(Y/N)`), 
+      ~ paste(na.omit(unique(as.character(.x))), collapse = "; ")
+    ),
+    .groups = "drop"
+  ) %>%
+  mutate(Extraction_ID = readr::parse_number(as.character(Extraction_ID))) %>%
+  filter(!is.na(Extraction_ID))
+
+
+Joint_w_dil_progress <- Joint_w_dil %>% 
+  # Drop overlapping columns from Joint_w_dil so left_join doesn't create .x / .y suffixes
+  select(-any_of(c("Date_DNA_Dilution", "LP_sucessful", "dilutions_completed"))) %>%
+  mutate(
+    Extraction_ID = readr::parse_number(as.character(Extraction_ID)),
+    round_original = as.numeric(round_original),
+    remaining_original_ul = as.numeric(remaining_original_ul)
+  ) %>%
+  left_join(
+    select(LP_summary, -any_of(c("round_original", "remaining_original_ul"))), 
+    by = "Extraction_ID"
+  ) %>%
+  mutate(
+    ul_used_for_dilutions = dilutions_completed * round_original,
+    remaining_original_ul = remaining_original_ul - ul_used_for_dilutions
+  )
+```
+
+
+
+
+```{r}
+Extra_inventory = Joint_w_dil_progress %>%
+  select(c(Extraction_ID, volXtra, remaining_original_ul, dilutions_completed, LP_sucessful, Prep_ID, Date_DNA_Dilution)) %>%
+  arrange(volXtra) %>%
+  arrange(remaining_original_ul)
+
+nonrepeatable_or_thin_ice = Extra_inventory %>%
+  filter(remaining_original_ul < 25) %>%
+  filter(volXtra == "A")
+```
+
+

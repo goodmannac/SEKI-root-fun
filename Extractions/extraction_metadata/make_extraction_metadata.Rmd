@@ -25,7 +25,7 @@ head(metaMain) # look at it
 
 # read in tab from EM Metadata entry spreadsheet with info on how much extra ground roots we have for each sample
 ```{r}
-xtra_grid = read_csv("../root_grounds_inventory/EM Metadata entry, SEKI 2024 - Xtra grounds volume.csv") # load in volumes of extra roots
+xtra_grid = read_csv("EM Metadata entry, SEKI 2024 - Xtra grounds volume.csv") # load in volumes of extra roots
 
 head(xtra_grid) # look at it
 
@@ -39,7 +39,10 @@ max(xtra_grid$Extraction_ID) # look at it again
 
 # make a single column in xtra_grid that says how much extra root grounds are left. A is least, E is most
 ```{r}
-xtra_grid = mutate(xtra_grid, volXtra = "placeholder")
+xtra_grid = mutate(xtra_grid, volXtra = "placeholder") # made a column called volXtra
+
+head(xtra_grid)
+
 for (i in 1:length(xtra_grid$Extraction_ID)) {
   if (is.na(xtra_grid$A[i]) == FALSE) {
     xtra_grid$volXtra[i] = "A"
@@ -152,7 +155,7 @@ to_extract <- to_extract %>%
 
 
 
-#write.csv(to_extract, "Results/extractions_left_after_16April2026_bigMetadata.csv")
+# write.csv(to_extract, "Results/extractions_left_after_16April2026_bigMetadata.csv")
 ```
 
 # tidy to_extract and save
