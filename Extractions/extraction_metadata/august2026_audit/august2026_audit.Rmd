@@ -225,38 +225,7 @@ LP_progress = read_csv(local_path)
 
 Which extraction IDs have been diluted, and how many times? And how much of the original volume is left now?
 
-this chunk has bugs; AG wrote most of it and gemini wrote some
-```{r}
-LP_summary <- LP_progress %>%
-
-  group_by(Extraction_ID) %>%
-  summarize(
-    # 1. Your original summary metrics
-    dilutions_completed = sum(!is.na(Date_DNA_Dilution)),
-    LP_sucessful = case_when(
-      any(`Sucsesfull-prep_(Y/N)` == "Y", na.rm = TRUE) ~ "Y",
-      any(is.na(`Sucsesfull-prep_(Y/N)`)) ~ "TBD",
-      all(`Sucsesfull-prep_(Y/N)` == "N", na.rm = TRUE) ~ "N",
-      TRUE ~ "TBD"
-    ),
-    
-    # 2. Concatenate all remaining original columns
-    across(
-      -c(Date_DNA_Dilution, `Sucsesfull-prep_(Y/N)`), 
-      ~ paste(na.omit(unique(.x)), collapse = "; ")
-    ),
-    .groups = "drop"
-  ) %>%
-  mutate(Extraction_ID = as.numeric(Extraction_ID)) %>%
-  filter(!is.na(Extraction_ID))
-
-
-Joint_w_dil_progress = Joint_w_dil %>% left_join(LP_summary, by = "Extraction_ID") %>%
-  mutate(ul_used_for_dilutions = dilutions_completed * round_original) %>%
-  mutate(remaining_original_ul = remaining_original_ul - ul_used_for_dilutions)
-```
-
-this version is gemini, based on my original, w a few edits from me
+written w google gemini
 ```{r}
 LP_summary <- LP_progress %>%
   group_by(Extraction_ID) %>%
@@ -265,61 +234,26 @@ LP_summary <- LP_progress %>%
     LP_sucessful = case_when(
       any(`Sucsesfull-prep_(Y/N)` == "Y", na.rm = TRUE) ~ "Y",
       all(`Sucsesfull-prep_(Y/N)` == "N", na.rm = TRUE) ~ "N",
-      .default = "TBD",
-      .unmatched = "default"
+      .default = "TBD"
     ),
     
-    # Only paste character/text columns to prevent turning numbers into strings
+    # Concatenate original metadata, but EXCLUDE the new summary columns
     across(
-      where(is.character) & -c(`Sucsesfull-prep_(Y/N)`), 
-      ~ paste(na.omit(unique(.x)), collapse = "; ")
-    ),
-    .groups = "drop"
-  ) %>%
-  mutate(Extraction_ID = readr::parse_number(as.character(Extraction_ID))) %>%
-  filter(!is.na(Extraction_ID))
-
-
-Joint_w_dil_progress <- Joint_w_dil %>% 
-  mutate(
-    Extraction_ID = readr::parse_number(as.character(Extraction_ID)),
-    round_original = as.numeric(round_original) # Ensure numeric type before join
-  ) %>%
-  left_join(LP_summary, by = "Extraction_ID") %>%
-  mutate(
-    ul_used_for_dilutions = dilutions_completed * round_original,
-    remaining_original_ul = remaining_original_ul - ul_used_for_dilutions
-  )
-```
-
-```{r}
-LP_summary <- LP_progress %>%
-  group_by(Extraction_ID) %>%
-  summarize(
-    dilutions_completed = sum(!is.na(Date_DNA_Dilution)),
-    LP_sucessful = case_when(
-      any(`Sucsesfull-prep_(Y/N)` == "Y", na.rm = TRUE) ~ "Y",
-      all(`Sucsesfull-prep_(Y/N)` == "N", na.rm = TRUE) ~ "N",
-      .default = "TBD",
-      .unmatched = "default"
-    ),
-    
-    # Explicitly concatenate Date_DNA_Dilution and other columns
-    across(
-      -c(`Sucsesfull-prep_(Y/N)`), 
+      -c(`Sucsesfull-prep_(Y/N)`, dilutions_completed, LP_sucessful), 
       ~ paste(na.omit(unique(as.character(.x))), collapse = "; ")
     ),
     .groups = "drop"
   ) %>%
-  mutate(Extraction_ID = readr::parse_number(as.character(Extraction_ID))) %>%
+  # suppressWarnings prevents the console clutter from metadata rows 
+  # like "# of samples completed" being turned into NA
+  mutate(Extraction_ID = suppressWarnings(readr::parse_number(as.character(Extraction_ID)))) %>%
   filter(!is.na(Extraction_ID))
 
 
 Joint_w_dil_progress <- Joint_w_dil %>% 
-  # Drop overlapping columns from Joint_w_dil so left_join doesn't create .x / .y suffixes
   select(-any_of(c("Date_DNA_Dilution", "LP_sucessful", "dilutions_completed"))) %>%
   mutate(
-    Extraction_ID = readr::parse_number(as.character(Extraction_ID)),
+    Extraction_ID = suppressWarnings(readr::parse_number(as.character(Extraction_ID))),
     round_original = as.numeric(round_original),
     remaining_original_ul = as.numeric(remaining_original_ul)
   ) %>%
@@ -331,9 +265,8 @@ Joint_w_dil_progress <- Joint_w_dil %>%
     ul_used_for_dilutions = dilutions_completed * round_original,
     remaining_original_ul = remaining_original_ul - ul_used_for_dilutions
   )
+
 ```
-
-
 
 
 ```{r}
@@ -343,8 +276,19 @@ Extra_inventory = Joint_w_dil_progress %>%
   arrange(remaining_original_ul)
 
 nonrepeatable_or_thin_ice = Extra_inventory %>%
-  filter(remaining_original_ul < 25) %>%
+  filter(remaining_original_ul < 30) %>%
   filter(volXtra == "A")
+
+re_extract = Extra_inventory %>%
+  filter(remaining_original_ul < 25) %>%
+  filter(volXtra != "A") %>%
+  filter(LP_sucessful == "N") %>%
+  filter(Date_DNA_Dilution == 20260728)
+
+re_dilute_from_original_extract = Extra_inventory %>%
+  filter(remaining_original_ul > 10) %>%
+  filter(LP_sucessful == "N") %>%
+  filter(Date_DNA_Dilution == 20260728)
 ```
 
 
