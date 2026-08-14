@@ -272,7 +272,7 @@ Joint_w_dil_progress <- Joint_w_dil %>%
 ```{r}
 Extra_inventory = Joint_w_dil_progress %>%
   select(c(Extraction_ID, volXtra, remaining_original_ul, dilutions_completed, LP_sucessful, Prep_ID, Date_DNA_Dilution, original_ng_per_ul)) %>%
-  mutate(ng_DNA_undiluted = original_ng_per_ul * remaining_original_ul)
+  mutate(ng_DNA_undiluted = original_ng_per_ul * remaining_original_ul) %>%
   arrange(volXtra) %>%
   arrange(remaining_original_ul)
 
