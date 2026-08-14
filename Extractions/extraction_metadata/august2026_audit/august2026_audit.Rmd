@@ -271,24 +271,46 @@ Joint_w_dil_progress <- Joint_w_dil %>%
 
 ```{r}
 Extra_inventory = Joint_w_dil_progress %>%
-  select(c(Extraction_ID, volXtra, remaining_original_ul, dilutions_completed, LP_sucessful, Prep_ID, Date_DNA_Dilution)) %>%
+  select(c(Extraction_ID, volXtra, remaining_original_ul, dilutions_completed, LP_sucessful, Prep_ID, Date_DNA_Dilution, original_ng_per_ul)) %>%
+  mutate(ng_DNA_undiluted = original_ng_per_ul * remaining_original_ul)
   arrange(volXtra) %>%
   arrange(remaining_original_ul)
 
 nonrepeatable_or_thin_ice = Extra_inventory %>%
-  filter(remaining_original_ul < 30) %>%
-  filter(volXtra == "A")
+  filter(remaining_original_ul < 30) %>% # arbitrary "not a lot" volume
+  filter(volXtra == "A") # least amount of extra root grounds
 
 re_extract = Extra_inventory %>%
-  filter(remaining_original_ul < 25) %>%
-  filter(volXtra != "A") %>%
-  filter(LP_sucessful == "N") %>%
-  filter(Date_DNA_Dilution == 20260728)
+  filter(remaining_original_ul < 15) %>% # arbitrary "not a lot" volume
+  filter(volXtra != "A") %>% # enough root grounds for a re-extraction
+  filter(LP_sucessful == "N") %>% # library prep attempts thus far have failed
+  filter(Date_DNA_Dilution == 20260728) # were in the batch of contaminated dilutions
 
 re_dilute_from_original_extract = Extra_inventory %>%
-  filter(remaining_original_ul > 10) %>%
-  filter(LP_sucessful == "N") %>%
-  filter(Date_DNA_Dilution == 20260728)
+  filter(remaining_original_ul > 15) %>% # arbitrary "enough" volume; could try to LP at least 10 times even if original concentration minimal
+  filter(LP_sucessful == "N") %>% # library prep attempts thus far have failed
+  filter(Date_DNA_Dilution == 20260728) # were in the batch of contaminated dilutions
+
+plenty_of_extra = Extra_inventory %>%
+  filter(remaining_original_ul > 50) %>% # arbitrary "lots" volume
+  filter(LP_sucessful != "Y") %>% # LPs so far failed or not attempted
+  filter(volXtra != "A") %>% # not almost no roots leftover
+  filter(volXtra != "B") # also not just a little bit of roots left over
 ```
+
+Export these inventories
+```{r}
+date_suffix <- paste0(format(Sys.Date(), "%Y%m%d"), ".csv") #define what this local file name will be, with today's date
+
+write.csv(nonrepeatable_or_thin_ice, paste0("Results/nonrepeatable_or_thin_ice_", date_suffix))
+
+write.csv(re_extract, paste0("Results/to_re_extract", date_suffix))
+
+write.csv(re_dilute_from_original_extract, paste0("Results/to_re_dilute_from_original_extract_", date_suffix))
+
+write.csv(plenty_of_extra, paste0("Results/plenty_of_extra_", date_suffix))
+
+```
+
 
 
