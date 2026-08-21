@@ -292,6 +292,7 @@ re_extract = Extra_inventory %>%
 re_dilute_from_original_extract = Extra_inventory %>%
   filter(remaining_original_ul > 15) %>% # arbitrary "enough" volume; could try to LP at least 10 times even if original concentration minimal
   filter(LP_sucessful == "N") %>% # library prep attempts thus far have failed
+    filter(volXtra != "A") %>% # enough root grounds for a re-extraction
   filter(Date_DNA_Dilution == 20260728) # were in the batch of contaminated dilutions
 
 plenty_of_extra = Extra_inventory %>%
