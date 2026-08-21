@@ -228,6 +228,14 @@ Which extraction IDs have been diluted, and how many times? And how much of the 
 written w google gemini
 ```{r}
 LP_summary <- LP_progress %>%
+  # 1. Clean and parse Extraction_ID FIRST so identical IDs group together
+  mutate(Extraction_ID = case_when (
+    str_detect(Extraction_ID, "C") ~ NA,
+    !str_detect(Extraction_ID, "C") ~ suppressWarnings(readr::parse_number(as.character(Extraction_ID))))
+    ) %>%
+  filter(!is.na(Extraction_ID)) %>%
+  
+  # 2. Group and summarize on the cleaned IDs
   group_by(Extraction_ID) %>%
   summarize(
     dilutions_completed = sum(!is.na(Date_DNA_Dilution)),
@@ -237,17 +245,13 @@ LP_summary <- LP_progress %>%
       .default = "TBD"
     ),
     
-    # Concatenate original metadata, but EXCLUDE the new summary columns
+    # Concatenate original metadata, excluding new summary columns
     across(
       -c(`Sucsesfull-prep_(Y/N)`, dilutions_completed, LP_sucessful), 
       ~ paste(na.omit(unique(as.character(.x))), collapse = "; ")
     ),
     .groups = "drop"
-  ) %>%
-  # suppressWarnings prevents the console clutter from metadata rows 
-  # like "# of samples completed" being turned into NA
-  mutate(Extraction_ID = suppressWarnings(readr::parse_number(as.character(Extraction_ID)))) %>%
-  filter(!is.na(Extraction_ID))
+  )
 
 
 Joint_w_dil_progress <- Joint_w_dil %>% 
@@ -265,7 +269,6 @@ Joint_w_dil_progress <- Joint_w_dil %>%
     ul_used_for_dilutions = dilutions_completed * round_original,
     remaining_original_ul = remaining_original_ul - ul_used_for_dilutions
   )
-
 ```
 
 
