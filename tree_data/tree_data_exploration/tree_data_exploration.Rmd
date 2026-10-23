@@ -1,0 +1,225 @@
+---
+title: "tree_data_exploration"
+output: github_document
+---
+
+```{r}
+library(googledrive)
+library(tidyverse)
+```
+
+
+```{r}
+name_of_transcription_file_on_drive = "Copy of SEKI_2024_TreeFieldData_20260816" # store a copy of the file's name, exactly as it appears on Google Drive
+
+dribble = drive_get(name_of_transcription_file_on_drive, corpus = "allDrives") # get necessary Google Drive metadata for downloading. This stores it in a special table called a "dribble". ** here, corpus = allDrives because this file does NOT live in the Bogar Lab drive; Jenny shared it with me
+
+# generate a file path and file name for the copy of the file you're about to make on your computer (in your local clone of this repository)
+local_path <- paste0("Inputs/",                               # Path starts with "Inputs/" -- you may need to manually generate an Inputs sub-folder inside the folder where this .Rmd lives
+                     name_of_transcription_file_on_drive,     # name starts identically to the name of the Google Drive version
+                     "_downloaded-",                          # name specifies when you downlaoded the file
+                     format(Sys.Date(), "%Y%m%d"),            # name includes today's date; auto-generated here
+                     ".csv")                                  # name ends in file type extension. change from .csv only if this isn't a spreadsheet for some reason
+
+# download the file from Google Drive
+drive_download(dribble,             # finds the file on Google Drive, using the metadata you saved above
+               type = "csv",        # specifies the kind of file to generate locally -- only change from csv if this isn't a spreadsheet
+               path = local_path,   # specifies the new file path you just generated above
+               overwrite = TRUE)    # maintains a maximum of one new version of this file that gets stored in the Inputs folder per day. 
+
+broad_treeData = read_csv(local_path) # reads the version of the file you downloaded today into your R environment (from your computer). You'll need a different function if it's not a csv
+```
+
+```{r}
+name_of_transcription_file_on_drive = "SEKI_2024_PlotData" # store a copy of the file's name, exactly as it appears on Google Drive
+
+dribble = drive_get(name_of_transcription_file_on_drive, corpus = "allDrives") # get necessary Google Drive metadata for downloading. This stores it in a special table called a "dribble". ** here, corpus = allDrives because this file does NOT live in the Bogar Lab drive; Jenny shared it with me
+
+# generate a file path and file name for the copy of the file you're about to make on your computer (in your local clone of this repository)
+local_path <- paste0("Inputs/",                               # Path starts with "Inputs/" -- you may need to manually generate an Inputs sub-folder inside the folder where this .Rmd lives
+                     name_of_transcription_file_on_drive,     # name starts identically to the name of the Google Drive version
+                     "_downloaded-",                          # name specifies when you downlaoded the file
+                     format(Sys.Date(), "%Y%m%d"),            # name includes today's date; auto-generated here
+                     ".csv")                                  # name ends in file type extension. change from .csv only if this isn't a spreadsheet for some reason
+
+# download the file from Google Drive
+drive_download(dribble,             # finds the file on Google Drive, using the metadata you saved above
+               type = "csv",        # specifies the kind of file to generate locally -- only change from csv if this isn't a spreadsheet
+               path = local_path,   # specifies the new file path you just generated above
+               overwrite = TRUE)    # maintains a maximum of one new version of this file that gets stored in the Inputs folder per day. 
+
+plotData = read_csv(local_path) # reads the version of the file you downloaded today into your R environment (from your computer). You'll need a different function if it's not a csv
+```
+```{r}
+name_of_transcription_file_on_drive = "EM Metadata entry, SEKI 2024" # store a copy of the file's name, exactly as it appears on Google Drive
+
+dribble = drive_get(name_of_transcription_file_on_drive, shared_drive = 'Bogar Lab') # get necessary Google Drive metadata for downloading. This stores it in a special table called a "dribble".
+
+# generate a file path and file name for the copy of the file you're about to make on your computer (in your local clone of this repository)
+local_path <- paste0("Inputs/",                               # Path starts with "Inputs/" -- you may need to manually generate an Inputs sub-folder inside the folder where this .Rmd lives
+                     name_of_transcription_file_on_drive,     # name starts identically to the name of the Google Drive version
+                     "_downloaded-",                          # name specifies when you downlaoded the file
+                     format(Sys.Date(), "%Y%m%d"),            # name includes today's date; auto-generated here
+                     ".csv")                                  # name ends in file type extension. change from .csv only if this isn't a spreadsheet for some reason
+
+# download the file from Google Drive
+drive_download(dribble,             # finds the file on Google Drive, using the metadata you saved above
+               type = "csv",        # specifies the kind of file to generate locally -- only change from csv if this isn't a spreadsheet
+               path = local_path,   # specifies the new file path you just generated above
+               overwrite = TRUE)    # maintains a maximum of one new version of this file that gets stored in the Inputs folder per day. 
+
+rootSamplingData = read_csv(local_path) # reads the version of the file you downloaded today into your R environment (from your computer). You'll need a different function if it's not a csv
+```
+# Tidy broad tree data
+```{r}
+pila_treeData = broad_treeData %>%
+  filter(Species == "PILA") %>%
+  mutate(Tree_Name = paste0(Plot_ID, "_", Tree_Number))
+```
+
+# Tidy plot data
+```{r}
+pila_plots = plotData %>%
+  filter(startsWith(Plot_Name, "PILA"))
+```
+
+# Tidy tree-level data for root-sampled trees
+```{r}
+rootSamplingData = rootSamplingData %>%
+  filter(startsWith(Plot_Name, "PILA")) %>%
+  filter(Plot_Name != "PILA8c_TharpsLog PTAQ")
+```
+
+
+# Join plot data to root-sampled tree data
+```{r}
+treeswroots_plots = left_join(rootSamplingData, pila_plots, by = "Plot_Name")
+
+head(treeswroots_plots)
+```
+
+# show elevation of trees
+```{r}
+colnames(treeswroots_plots)
+```
+
+```{r}
+ggplot(treeswroots_plots, aes(x = Plot_Elevation_m, y = Plot_Elevation_m)) +
+  geom_point()
+```
+# add missing elevation data
+
+```{r}
+m_elev_7a = NA # blank on the scanned datasheet
+
+m_elev_8a = c(2356, 2294, 2290) # three elevations listed on physical datasheet
+m_elev_8a = mean(m_elev_8a)
+
+m_elev_8b = NA # blank on the scanned datasheet
+m_elev_8c = NA # blank on the scanned datasheet
+
+```
+
+
+```{r}
+pila_plots = pila_plots %>%
+  mutate(Plot_Elevation_m = case_when(
+    Plot_Name == "PILA8a_SillimanCreek" ~ m_elev_8a,
+    .default = Plot_Elevation_m
+  ))
+```
+
+## re-join plot data to root-sampled tree data
+```{r}
+treeswroots_plots = left_join(rootSamplingData, pila_plots, by = "Plot_Name")
+
+head(treeswroots_plots)
+```
+```{r}
+ggplot(treeswroots_plots, aes(x = Plot_Elevation_m, y = Plot_Elevation_m)) +
+  geom_point() + 
+  geom_text(aes(label = Plot_Name), vjust = 0, hjust = -0.1)
+```
+
+```{r}
+for_elev_hist = treeswroots_plots %>%
+  group_by(Plot_Name) %>%
+  summarise(Plot_Elevation_m = median(Plot_Elevation_m), trees_per_plot = n())
+
+head(for_elev_hist)
+
+ggplot(for_elev_hist, aes(x = Plot_Elevation_m, y = trees_per_plot)) +
+  geom_bar(stat = "identity") +
+  geom_text(aes(label = Plot_Name), vjust = 0, hjust = -0.1)
+```
+
+
+# Join broad tree data to root-sampled tree data
+```{r}
+treeswroots = left_join(treeswroots_plots, pila_treeData, by = "Tree_Name")
+
+head(treeswroots)
+```
+
+# compare tree data across elevation
+## many plots have yet to have full tree data entered here
+
+### percent of tree (branches/canopy) dead, assesed by jenny. not sure how pDead_full relates to pDead_rg or which should be considered, though
+```{r}
+ggplot(treeswroots, aes(x = Plot_Elevation_m, y = pDead_full)) +
+  geom_point() + 
+  geom_text(
+    data = treeswroots %>% distinct(Plot_Name.x, Plot_Elevation_m),
+    aes(x = Plot_Elevation_m, y = Inf, label = Plot_Name.x),
+
+    angle = 90,
+    vjust = -0.5,
+    hjust = 1.2
+  )
+
+```
+
+### tree diameter at breast height
+```{r}
+ggplot(treeswroots, aes(x = Plot_Elevation_m, y = DBH)) +
+  geom_point() + 
+  geom_text(
+    data = treeswroots %>% distinct(Plot_Name.x, Plot_Elevation_m),
+    aes(x = Plot_Elevation_m, y = Inf, label = Plot_Name.x),
+
+    angle = 90,
+    vjust = -0.5,
+    hjust = 1.2
+  )
+```
+oop! little trees only at pila3b
+
+### tree height
+```{r}
+ggplot(treeswroots, aes(x = Plot_Elevation_m, y = Height)) +
+  geom_point() +
+  geom_text(
+    data = treeswroots %>% distinct(Plot_Name.x, Plot_Elevation_m),
+    aes(x = Plot_Elevation_m, y = Inf, label = Plot_Name.x),
+
+    angle = 90,
+    vjust = -0.5,
+    hjust = 1.2
+  )
+```
+
+```{r}
+ggplot(treeswroots, aes(x = Plot_Elevation_m, y = Fire)) +
+  geom_point() + 
+  geom_text(
+    data = treeswroots %>% distinct(Plot_Name.x, Plot_Elevation_m),
+    aes(x = Plot_Elevation_m, y = Inf, label = Plot_Name.x),
+
+    angle = 90,
+    vjust = -1,
+    hjust = 1.2
+  )
+```
+
+
+

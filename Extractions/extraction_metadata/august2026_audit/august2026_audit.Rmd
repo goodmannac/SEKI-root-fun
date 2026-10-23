@@ -314,6 +314,8 @@ write.csv(re_dilute_from_original_extract, paste0("Results/to_re_dilute_from_ori
 
 write.csv(plenty_of_extra, paste0("Results/plenty_of_extra_", date_suffix))
 
+write.csv(Joint_w_dil_progress, paste0("Results/extraction_and_LP_metadata", date_suffix))
+
 ```
 
 
