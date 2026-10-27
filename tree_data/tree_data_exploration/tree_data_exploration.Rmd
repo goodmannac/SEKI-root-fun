@@ -179,6 +179,13 @@ ggplot(treeswroots, aes(x = Plot_Elevation_m, y = pDead_full)) +
 
 ```
 
+```{r}
+hist(treeswroots$pDead_full)
+```
+```{r}
+hist(treeswroots$Plot_Elevation_m)
+```
+
 ### tree diameter at breast height
 ```{r}
 ggplot(treeswroots, aes(x = Plot_Elevation_m, y = DBH)) +
@@ -219,6 +226,61 @@ ggplot(treeswroots, aes(x = Plot_Elevation_m, y = Fire)) +
     vjust = -1,
     hjust = 1.2
   )
+```
+# Explore CSV Jenny pulled from SQL database!
+
+```{r}
+sql_data = read_csv("Inputs/PILA_plot_tree.csv")
+colnames(sql_data)
+```
+
+```{r}
+sql_data_grouped = sql_data %>%
+  group_by(tree_id) %>%
+  summarise(plot_elevation_m = mean(plot_elevation_m), precip_30yr_normal_mm = mean(precip_30yr_normal_mm), p_dead = mean(na.omit(p_dead)), slope_tree = mean(slope_tree))
+```
+
+```{r}
+Elevation_m = sql_data$plot_elevation_m
+hist(Elevation_m)
+
+# which plot is so high up?
+sql_data %>% filter(plot_elevation_m > 2500)
+```
+```{r}
+dead_pct = as.numeric(sql_data$p_dead)
+hist(dead_pct)
+```
+
+
+```{r}
+ggplot(sql_data, aes(x = plot_elevation_m, y = as.numeric(height))) +
+  geom_point() +
+  geom_text(
+    data = treeswroots %>% distinct(Plot_Name.x, Plot_Elevation_m),
+    aes(x = Plot_Elevation_m, y = Inf, label = Plot_Name.x),
+
+    angle = 90,
+    vjust = -0.5,
+    hjust = 1.2
+  )
+```
+```{r}
+sql_data_on_treeswroots = left_join(x = treeswroots, y = sql_data, join_by(Plot_Name.x == plot_name), multiple = "any")
+```
+
+```{r}
+Elevation_m = sql_data_on_treeswroots$plot_elevation_m
+hist(Elevation_m)
+
+# which plot is so high up?
+sql_data %>% filter(plot_elevation_m > 2500)
+```
+
+```{r}
+Percent_dead = as.numeric(sql_data_on_treeswroots$p_dead)
+hist(Percent_dead)
+
 ```
 
 
